@@ -1,1 +1,53 @@
-node_modules/ 
+# === Node.js dependencies ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Environment variables ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+
+# === Build & Dist folders ===
+dist/
+build/
+coverage/
+*.tgz
+
+# === Logs ===
+logs
+*.log
+*.log.*
+
+# === IDE & Editor settings ===
+.vscode/
+.idea/
+*.swp
+
+# === OS Generated Files ===
+.DS_Store
+Thumbs.db
+
+# === Temporary or lock files ===
+*.tmp
+*.pid
+*.seed
+*.bak
+*.old
+
+# === Frontend Build Artifacts (Vite / React) ===
+*.cache
+*.parcel-cache
+*.eslintcache
+public/build/
+frontend/dist/
+frontend/build/
+
+# === Misc ===
+package-lock.json
+.pnpm-store/
