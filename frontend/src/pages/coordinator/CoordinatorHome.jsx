@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Loader, X, Eye, Edit, Trash2 } from 'lucide-react'
-import { timetableAPI } from '../../utils/api'
+import { Calendar, Loader, X, Edit, Trash2 } from 'lucide-react'
+import api, { timetableAPI } from '../../utils/api'
 import toast from 'react-hot-toast'
 
 const CoordinatorHome = () => {
@@ -23,7 +23,31 @@ const CoordinatorHome = () => {
     }
   ]
 
-  // Fetch timetable statistics on component mount
+  // === Load latest stats if available (from publish sync)
+  useEffect(() => {
+    const cachedStats = localStorage.getItem('latestTimetableStats')
+    if (cachedStats) {
+      try {
+        const parsed = JSON.parse(cachedStats)
+        const { totalTimetables } = parsed.overview || {}
+        if (totalTimetables !== undefined) {
+          setStats([
+            { 
+              icon: Calendar, 
+              label: 'Timetables', 
+              value: totalTimetables.toString(), 
+              color: 'bg-purple-500', 
+              loading: false 
+            },
+          ])
+        }
+      } catch (e) {
+        console.warn('Invalid cached stats, skipping...')
+      }
+    }
+  }, [])
+
+  // === Fetch timetable statistics on mount (override cache)
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -52,11 +76,25 @@ const CoordinatorHome = () => {
     fetchStats()
   }, [])
 
-  // Fetch all timetables when count is clicked
+  // === Fetch all timetables (with cache-busting)
   const fetchTimetables = async () => {
     try {
       setLoadingTimetables(true)
-      const response = await timetableAPI.getTimetables()
+      const cachedList = localStorage.getItem('latestTimetableList')
+      if (cachedList) {
+        try {
+          const parsed = JSON.parse(cachedList)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTimetables(parsed)
+            console.log('✅ Using synced timetable list from publish cache')
+          }
+        } catch {
+          console.warn('Invalid cached timetable list, skipping...')
+        }
+      }
+
+      // Always refresh live (so even old cache gets replaced)
+      const response = await api.get(`/timetable?t=${Date.now()}`)
       if (response.data.success) {
         setTimetables(response.data.data)
       }
@@ -96,9 +134,7 @@ const CoordinatorHome = () => {
       try {
         await timetableAPI.deleteTimetable(timetableId)
         toast.success('Timetable deleted successfully')
-        fetchTimetables() // Refresh the list
-        
-        // Update stats
+        fetchTimetables() // Refresh list and stats
         const response = await timetableAPI.getTimetableStats()
         if (response.data.success) {
           const { totalTimetables } = response.data.data.overview

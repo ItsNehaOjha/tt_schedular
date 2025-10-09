@@ -77,6 +77,18 @@ const timetableSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  publishedVersion: {
+  type: Number,
+  default: 1
+},
+revisionHistory: [
+  {
+    version: Number,
+    updatedAt: Date,
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }
+],
+
   schedule: [scheduleSlotSchema],
   isPublished: {
     type: Boolean,
@@ -99,7 +111,11 @@ const timetableSchema = new mongoose.Schema({
 })
 
 // Compound index for unique timetable per year-branch-section
-timetableSchema.index({ year: 1, branch: 1, section: 1 }, { unique: true })
+timetableSchema.index(
+  { year: 1, branch: 1, section: 1, semester: 1, academicYear: 1 },
+  { unique: true }
+);
+
 
 // Index for faster queries
 timetableSchema.index({ isPublished: 1 })

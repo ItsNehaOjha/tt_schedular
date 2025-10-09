@@ -1,10 +1,11 @@
+// src/pages/coordinator/CoordinatorTimetable.jsx
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Calendar, Edit } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TimetableSelector from '../../components/TimetableSelector'
 import TimetableGrid from '../../components/TimetableGrid'
-import { timetableAPI } from '../../utils/api'
+import api, { timetableAPI } from '../../utils/api'
 
 const CoordinatorTimetable = () => {
   const [currentStep, setCurrentStep] = useState('selector')
@@ -12,46 +13,51 @@ const CoordinatorTimetable = () => {
   const [timetableData, setTimetableData] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // === Load saved state from localStorage ===
+  const [savedTimetableId, setSavedTimetableId] = useState(null)
+  const [isPublished, setIsPublished] = useState(false)
+
+  // === Helper to unwrap axios responses ===
+  const unwrapResponse = (response) => {
+    if (!response) return null
+    if (response.data?.data) return response.data.data
+    if (response.data?.year) return response.data
+    return response
+  }
+
+  // === Load saved state & fetch backend version ===
   useEffect(() => {
-    console.log('🔍 CoordinatorTimetable useEffect triggered')
     try {
       const savedStep = localStorage.getItem('coordinatorTimetable_currentStep')
       const savedClass = localStorage.getItem('coordinatorTimetable_selectedClass')
       const savedData = localStorage.getItem('coordinatorTimetable_timetableData')
 
-      console.log('📦 localStorage values:', { 
-        savedStep, 
-        savedClass: savedClass ? 'exists' : 'null', 
-        savedData: savedData ? 'exists' : 'null' 
-      })
-
       if (savedStep && savedClass) {
-        console.log('✅ Setting up from localStorage - step:', savedStep)
         setCurrentStep(savedStep)
         const classData = JSON.parse(savedClass)
         setSelectedClass(classData)
-        
-        if (savedData) {
-          console.log('📊 Loading timetable data from localStorage')
-          setTimetableData(JSON.parse(savedData))
+
+        let parsed = null
+        try {
+          if (savedData) parsed = JSON.parse(savedData)
+        } catch (e) {
+          console.warn('Failed to parse saved timetableData', e)
         }
-        
-        // Always fetch fresh data when in edit or grid mode to ensure we have the latest version
-        if (savedStep === 'edit' || savedStep === 'grid') {
-          console.log('🔄 Fetching fresh data for step:', savedStep)
-          fetchExistingTimetable(classData)
+
+        if (parsed) {
+          setTimetableData(parsed)
+          setSavedTimetableId(parsed._id || parsed.id || null)
+          setIsPublished(Boolean(parsed.isPublished))
         }
+
+        fetchExistingTimetable(classData)
       } else {
-        console.log('❌ Missing localStorage data - showing selector')
+        setCurrentStep('selector')
       }
     } catch (err) {
-      console.error('❗ State load error:', err)
-      // Don't clear localStorage immediately, might be a temporary parsing issue
+      console.error('State load error:', err)
     }
   }, [])
 
-  // === Persist selections ===
   useEffect(() => {
     if (selectedClass)
       localStorage.setItem('coordinatorTimetable_selectedClass', JSON.stringify(selectedClass))
@@ -63,20 +69,15 @@ const CoordinatorTimetable = () => {
   }, [timetableData])
 
   useEffect(() => {
-    // Only persist to localStorage if we're not in the initial load phase
-    // This prevents overwriting the saved state during component initialization
     const isInitialLoad = !selectedClass && !timetableData
-    if (!isInitialLoad) {
+    if (!isInitialLoad)
       localStorage.setItem('coordinatorTimetable_currentStep', currentStep)
-    }
   }, [currentStep, selectedClass, timetableData])
 
-  // === Fetch existing timetable from backend ===
+  // === Fetch existing timetable ===
   const fetchExistingTimetable = async (classData) => {
     try {
       setLoading(true)
-      console.log('Fetching timetable for class:', classData)
-      
       const response = await timetableAPI.getTimetableByClass({
         year: classData.year,
         branch: classData.branch,
@@ -84,19 +85,22 @@ const CoordinatorTimetable = () => {
         semester: classData.semester,
         academicYear: classData.academicYear
       })
-      
-      console.log('Fetched timetable response:', response)
-      setTimetableData(response.data || null)
-      
+      const data = unwrapResponse(response)
+      if (data) {
+        setTimetableData(data)
+        setSavedTimetableId(data._id || data.id)
+        setIsPublished(Boolean(data.isPublished))
+      } else {
+        setTimetableData(null)
+        setSavedTimetableId(null)
+        setIsPublished(false)
+      }
     } catch (err) {
       console.error('Fetch timetable error:', err)
-      // If timetable doesn't exist, that's okay - we'll create a new one
       if (err.response?.status === 404) {
-        console.log('No existing timetable found, will create new one')
         setTimetableData(null)
       } else {
-        toast.error('Failed to fetch timetable data')
-        setTimetableData(null)
+        toast.error('Failed to fetch timetable')
       }
     } finally {
       setLoading(false)
@@ -104,50 +108,34 @@ const CoordinatorTimetable = () => {
   }
 
   const handleClassSelection = async (classData) => {
-    console.log('Class selected:', classData)
     setSelectedClass(classData)
     setCurrentStep('grid')
-    
-    // Store in localStorage for persistence
-    localStorage.setItem('coordinatorTimetable_selectedClass', JSON.stringify(classData))
-    localStorage.setItem('coordinatorTimetable_currentStep', 'grid')
-    
     await fetchExistingTimetable(classData)
   }
 
-  // === Navigation ===
   const handleBackToSelector = () => {
-    const key = selectedClass
-      ? `timetable_draft_${selectedClass.branch}_${selectedClass.year}_${selectedClass.section}`
-      : null
-
-    if (key && localStorage.getItem(key)) {
-      if (!window.confirm('Unsaved changes will be lost. Continue?')) return
-      localStorage.removeItem(key)
-    }
-
     localStorage.removeItem('coordinatorTimetable_selectedClass')
     localStorage.removeItem('coordinatorTimetable_timetableData')
     setSelectedClass(null)
     setTimetableData(null)
+    setSavedTimetableId(null)
+    setIsPublished(false)
     setCurrentStep('selector')
   }
 
   const handleEditTimetable = () => setCurrentStep('edit')
   const handleBackToGrid = () => setCurrentStep('grid')
 
-  // === Sanitize before save/publish ===
+  // === Sanitize schedule ===
   const sanitizeSchedule = (schedule) => {
-    // Handle both array and object formats
     if (Array.isArray(schedule)) return schedule
-
-    const sanitized = []
+    const result = []
     Object.entries(schedule || {}).forEach(([day, timeSlots]) => {
-      Object.entries(timeSlots || {}).forEach(([timeSlot, cell]) => {
+      Object.entries(timeSlots || {}).forEach(([slot, cell]) => {
         if (cell && (cell.subject || cell.teacher)) {
-          sanitized.push({
+          result.push({
             day,
-            timeSlot,
+            timeSlot: slot,
             subject: {
               acronym: cell.subject || '',
               code: cell.code || '',
@@ -167,98 +155,100 @@ const CoordinatorTimetable = () => {
         }
       })
     })
-    return sanitized
+    return result
   }
 
-  // === Save timetable ===
+  // === Save Timetable ===
   const handleSaveTimetable = async (data) => {
     try {
       const toastId = toast.loading('Saving timetable...')
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       const coordinatorId = user.id || user._id
-      if (!coordinatorId) return toast.error('Login required.')
+      if (!coordinatorId) {
+        toast.dismiss(toastId)
+        return toast.error('Login required.')
+      }
 
-      const sanitizedSchedule = sanitizeSchedule(data.schedule)
-      const timetableToSave = {
+      const sanitized = sanitizeSchedule(data.schedule)
+      const payload = {
         year: data.year || selectedClass?.year,
-        branch: data.branch || selectedClass?.branch,
+        branch: (data.branch || selectedClass?.branch || '').toLowerCase(),
         section: data.section || selectedClass?.section,
         semester: data.semester || selectedClass?.semester,
         academicYear: data.academicYear || selectedClass?.academicYear,
-        schedule: sanitizedSchedule,
+        schedule: sanitized,
         createdBy: coordinatorId
       }
 
-      console.log('🧩 Saving Timetable:', timetableToSave)
+      let response
+      const id = timetableData?._id || timetableData?.id
+      if (id) response = await timetableAPI.updateTimetable(id, payload)
+      else response = await timetableAPI.createTimetable(payload)
 
-      const response =
-        timetableData?.id || timetableData?._id
-          ? await timetableAPI.updateTimetable(timetableData.id || timetableData._id, timetableToSave)
-          : await timetableAPI.createTimetable(timetableToSave)
+      const saved = unwrapResponse(response)
+      if (!saved) throw new Error('Invalid save response')
+
+      setTimetableData(saved)
+      setSavedTimetableId(saved._id || saved.id)
+      setIsPublished(Boolean(saved.isPublished))
 
       toast.dismiss(toastId)
-      if (response.data) {
-        toast.success('Timetable saved successfully!')
-        setTimetableData(response.data)
-        const key = selectedClass
-          ? `timetable_draft_${selectedClass.branch}_${selectedClass.year}_${selectedClass.section}`
-          : null
-        if (key) localStorage.removeItem(key)
-        setCurrentStep('grid')
-      } else toast.error('Failed to save timetable.')
+      toast.success('Timetable saved successfully!')
+      setCurrentStep('grid')
+      return saved
     } catch (err) {
       console.error('Save error:', err)
-      toast.error('Failed to save timetable: ' + (err.response?.data?.message || err.message))
+      toast.error('Failed to save timetable')
+      throw err
     }
   }
 
-  // === Publish timetable ===
+  // === Publish Timetable ===
   const handlePublishTimetable = async (data) => {
     try {
       const toastId = toast.loading('Publishing timetable...')
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       const coordinatorId = user.id || user._id
-      if (!coordinatorId) return toast.error('Login required.')
+      if (!coordinatorId) {
+        toast.dismiss(toastId)
+        return toast.error('Login required.')
+      }
 
-      const sanitizedSchedule = sanitizeSchedule(data.schedule)
-      const timetableToPublish = {
+      const sanitized = sanitizeSchedule(data.schedule)
+      const fullPayload = {
         year: data.year || selectedClass?.year,
-        branch: data.branch || selectedClass?.branch,
+        branch: (data.branch || selectedClass?.branch || '').toLowerCase(),
         section: data.section || selectedClass?.section,
         semester: data.semester || selectedClass?.semester,
         academicYear: data.academicYear || selectedClass?.academicYear,
-        schedule: sanitizedSchedule,
-        createdBy: coordinatorId,
-        isPublished: true,
-        publishedAt: new Date().toISOString()
+        schedule: sanitized,
+        isPublished: true
       }
 
-      console.log('🚀 Publishing Timetable:', timetableToPublish)
+      const id = timetableData?._id || timetableData?.id
+      const response = await timetableAPI.publishTimetable(id, fullPayload)
 
-      const response =
-        timetableData?.id || timetableData?._id
-          ? await timetableAPI.publishTimetable(timetableData.id || timetableData._id, timetableToPublish)
-          : await timetableAPI.createTimetable(timetableToPublish)
+      const published = unwrapResponse(response)
+      if (!published) throw new Error('Invalid publish response')
+
+      setTimetableData(published)
+      setSavedTimetableId(published._id || published.id)
+      setIsPublished(true)
 
       toast.dismiss(toastId)
-      if (response.data) {
-        toast.success('Timetable published successfully!')
-        setTimetableData(response.data)
-        const key = selectedClass
-          ? `timetable_draft_${selectedClass.branch}_${selectedClass.year}_${selectedClass.section}`
-          : null
-        if (key) localStorage.removeItem(key)
-        setCurrentStep('grid')
-      } else toast.error('Failed to publish timetable.')
+      toast.success('Timetable published successfully!')
+      setCurrentStep('grid')
+      return published
     } catch (err) {
       console.error('Publish error:', err)
-      toast.error('Failed to publish timetable: ' + (err.response?.data?.message || err.message))
+      toast.error(
+        'Failed to publish timetable: ' + (err.response?.data?.message || err.message)
+      )
+      throw err
     }
   }
 
-  // === Render ===
-  console.log('🎨 Rendering - currentStep:', currentStep, 'selectedClass:', selectedClass ? 'exists' : 'null', 'timetableData:', timetableData ? 'exists' : 'null')
-
+  // === Render Views ===
   if (currentStep === 'selector')
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
@@ -267,7 +257,7 @@ const CoordinatorTimetable = () => {
             <Calendar className="w-8 h-8 text-purple-500 mr-3" />
             <h1 className="text-3xl font-bold text-gray-900">Build Timetable</h1>
           </div>
-          <p className="text-gray-600">Select the class for which you want to create or edit a timetable</p>
+          <p className="text-gray-600">Select the class to create or edit its timetable</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
@@ -289,7 +279,7 @@ const CoordinatorTimetable = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 Timetable - {selectedClass?.year} {selectedClass?.branch} {selectedClass?.section}
               </h1>
-              <p className="text-gray-600">View and manage class timetable</p>
+              <p className="text-gray-600">View and manage timetable</p>
             </div>
           </div>
           <button
@@ -307,6 +297,9 @@ const CoordinatorTimetable = () => {
           isEditable={false}
           showPDFExport={true}
           mode="view"
+          onPublish={handlePublishTimetable}
+          savedTimetableId={savedTimetableId}
+          isPublished={isPublished}
         />
       </motion.div>
     )
@@ -323,7 +316,7 @@ const CoordinatorTimetable = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 Edit Timetable - {selectedClass?.year} {selectedClass?.branch} {selectedClass?.section}
               </h1>
-              <p className="text-gray-600">Create and modify class schedule</p>
+              <p className="text-gray-600">Modify and update class schedule</p>
             </div>
           </div>
         </div>
@@ -337,6 +330,8 @@ const CoordinatorTimetable = () => {
           onSave={handleSaveTimetable}
           onPublish={handlePublishTimetable}
           mode="edit"
+          savedTimetableId={savedTimetableId}
+          isPublished={isPublished}
         />
       </motion.div>
     )
