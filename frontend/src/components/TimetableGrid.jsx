@@ -578,7 +578,7 @@
         const pageTitle = document.title
         const headerText = document.querySelector('h2')?.textContent || ''
         if (!year && (pageTitle.includes('3rd Year') || headerText.includes('3rd Year'))) year = '3rd Year'
-        if (!branch && (pageTitle.toLowerCase().includes('cse') || headerText.toLowerCase().includes('cse'))) branch = 'cse'
+        if (!branch && (pageTitle.toUpperCase().includes('CSE') || headerText.toUpperCase().includes('CSE'))) branch = 'CSE'
         if (!section && (pageTitle.includes(' A') || headerText.includes(' A'))) section = 'A'
       }
 
@@ -866,7 +866,19 @@
             <div className="flex items-center space-x-2">
               {(isEditable || mode === 'edit' || mode === 'create') && (
                 <>
-                  <button onClick={() => { clearLocalTimetableData() }} className="p-2 hover:bg-white/20 rounded-lg transition-colors" title="Clear Timetable"><RotateCcw className="w-5 h-5" /></button>
+                  <button
+  onClick={() => {
+    clearLocalTimetableData()
+    // Reset in-memory data too (so grid instantly clears)
+    setScheduleData(createEmptySchedule(days, timeSlots))
+    toast.success('Timetable reset successfully!')
+  }}
+  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+  title="Clear Timetable"
+>
+  <RotateCcw className="w-5 h-5" />
+</button>
+
                   <button onClick={handleSave} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex items-center space-x-2">
                     <Save className="w-4 h-4" /><span>Save</span>
                   </button>
@@ -905,14 +917,17 @@
                 <option value="3rd Year">3rd Year</option>
                 <option value="4th Year">4th Year</option>
               </select>
-              <select value={timetableInfo.branch} onChange={(e) => setTimetableInfo(prev => ({ ...prev, branch: e.target.value }))} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" required>
+              <select value={timetableInfo.branch} onChange={(e) => setTimetableInfo(prev => ({ ...prev, branch: e.target.value.toUpperCase() }))} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" required>
                 <option value="">Select Branch</option>
-                <option value="cse">Computer Science</option>
-                <option value="ece">Electronics</option>
-                <option value="mech">Mechanical</option>
-                <option value="civil">Civil</option>
-                <option value="eee">Electrical</option>
-                <option value="it">Information Technology</option>
+                    <option value="CSE">CSE</option>
+                    <option value="CS">CS</option>
+                    <option value="IT">IT</option>
+                    <option value="EC">EC</option>
+                    <option value="EE">EE</option>
+                    <option value="ME">ME</option>
+                    <option value="CE">CE</option>
+                    <option value="MCA">MCA</option>
+                    <option value="MBA">MBA</option>
               </select>
               <select value={timetableInfo.section} onChange={(e) => setTimetableInfo(prev => ({ ...prev, section: e.target.value }))} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" required>
                 <option value="">Select Section</option>

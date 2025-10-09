@@ -56,14 +56,13 @@ export const getTimetableByBranchSection = asyncHandler(async (req, res, next) =
 
   const timetable = await Timetable.findOne({
     year,
-    branch: branch.toLowerCase(),
+    branch: branch.toUpperCase(),
     section: section.toUpperCase(),
     isPublished: true
   }).populate('createdBy', 'username firstName lastName')
 
   if (!timetable) return next(new AppError('No published timetable found for this class', 404))
 
-  // 🔹 Inject computed grid info for frontend
   const days = [...new Set(timetable.schedule.map(s => s.day))].filter(Boolean)
   const timeSlots = [...new Set(timetable.schedule.map(s => s.timeSlot))].filter(Boolean)
 
@@ -95,7 +94,7 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
 
   const timetable = await Timetable.findOne({
     year: mappedYear,
-    branch: branch.toLowerCase(),
+    branch: branch.toUpperCase(),
     section: section.toUpperCase(),
     isPublished: true
   }).populate('createdBy', 'username firstName lastName')
@@ -166,7 +165,7 @@ export const getTeacherTimetable = asyncHandler(async (req, res, next) => {
 
 /* ============================================================
    🟢 GET TIMETABLE BY CLASS (for Coordinators)
-   Route: GET /api/timetable/class?year=3rd&branch=cse&section=A
+   Route: GET /api/timetable/class?year=3rd&branch=CSE&section=A
    Access: Private (Coordinator)
 ============================================================ */
 export const getTimetableByClass = asyncHandler(async (req, res, next) => {
@@ -177,7 +176,7 @@ export const getTimetableByClass = asyncHandler(async (req, res, next) => {
 
   const timetable = await Timetable.findOne({
     year,
-    branch: branch.toLowerCase(),
+    branch: branch.toUpperCase(),
     section: section.toUpperCase()
   })
     .sort({ updatedAt: -1 })
@@ -205,7 +204,11 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
 
   const { year, branch, section, semester, academicYear, schedule } = req.body
 
-  const existing = await Timetable.findOne({ year, branch, section })
+  // --- Normalize branch and section casing before saving ---
+  if (branch) req.body.branch = branch.toUpperCase();
+  if (section) req.body.section = section.toUpperCase();
+
+  const existing = await Timetable.findOne({ year, branch: req.body.branch, section: req.body.section })
   if (existing) {
     return res.status(200).json({
       success: true,
@@ -234,8 +237,8 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
 
   const timetable = await Timetable.create({
     year,
-    branch: branch.toLowerCase(),
-    section: section.toUpperCase(),
+    branch: req.body.branch,
+    section: req.body.section,
     semester,
     academicYear,
     schedule: processedSchedule,
@@ -253,6 +256,10 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
    Access: Private (Coordinator)
 ============================================================ */
 export const updateTimetable = asyncHandler(async (req, res, next) => {
+  // ✅ Fix: Normalize branch/section before validation or update
+  if (req.body.branch) req.body.branch = req.body.branch.toUpperCase().trim();
+  if (req.body.section) req.body.section = req.body.section.toUpperCase().trim();
+
   let timetable = await Timetable.findById(req.params.id)
   if (!timetable) return next(new AppError('Timetable not found', 404))
 
@@ -275,7 +282,7 @@ export const publishTimetable = asyncHandler(async (req, res, next) => {
   if (!year || !branch || !section || !semester || !academicYear)
     return next(new AppError('Missing class identifiers', 400))
 
-  const filter = { year, branch, section, semester, academicYear }
+  const filter = { year, branch: branch.toUpperCase(), section: section.toUpperCase(), semester, academicYear }
   const timetable = await Timetable.findOne(filter)
 
   const baseSet = {

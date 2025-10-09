@@ -323,7 +323,7 @@ const TeacherManagement = () => {
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     className="input"
-                    placeholder="cse"
+                    placeholder="CSE"
                     disabled={createTeacherMutation.isPending || updateTeacherMutation.isPending}
                   />
                 </div>

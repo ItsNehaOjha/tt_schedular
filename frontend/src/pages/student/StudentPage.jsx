@@ -44,7 +44,8 @@ const StudentPage = () => {
       // Fallback to static options
       setOptions({
         years: ['1', '2', '3', '4'],
-        branches: ['cse', 'ece', 'eee', 'mech', 'civil', 'it'],
+        branches: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'],
+
         sections: ['A', 'B', 'C', 'D']
       })
     } finally {

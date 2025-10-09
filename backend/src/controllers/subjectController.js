@@ -37,7 +37,7 @@ export const initializePredefinedSubjects = asyncHandler(async (req, res, next) 
     
     const subjectsToCreate = predefinedSubjects.map(subject => ({
       ...subject,
-      branches: ['cse'], // Default to cse branch
+      branches: req.body.branches?.map(b => b.toUpperCase()) || ['CSE'],
       createdBy: req.user.id
     }))
 
@@ -74,6 +74,12 @@ export const createSubject = asyncHandler(async (req, res, next) => {
   if (!branches || branches.length === 0) {
     branches = [req.user.branch]
   }
+  if (branches && branches.length > 0) {
+  branches = branches.map(b => b.toUpperCase())
+} else {
+  branches = [req.user.branch?.toUpperCase() || 'CSE']
+}
+
 
   // Safely handle code and acronym with proper validation
   const normalizedCode = String(code).toUpperCase().trim()

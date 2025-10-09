@@ -11,7 +11,7 @@ const CoordinatorClasses = () => {
   const [editingClass, setEditingClass] = useState(null)
   const [formData, setFormData] = useState({
     year: 1,
-    branch: 'cse',
+    branch: 'CSE',
     section: 'A',
     semester: 1,
     academicYear: '2024-25'
@@ -82,7 +82,7 @@ const CoordinatorClasses = () => {
   const resetForm = () => {
     setFormData({
       year: 1,
-      branch: 'cse',
+      branch: 'CSE',
       section: 'A',
       semester: 1,
       academicYear: '2024-25'
@@ -210,10 +210,10 @@ const CoordinatorClasses = () => {
                     onChange={handleInputChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   >
-                    <option value="cse">CSE</option>
-                    <option value="ece">ECE</option>
-                    <option value="me">ME</option>
-                    <option value="ce">CE</option>
+                    <option value="CSE">CSE</option>
+                    <option value="EC">EC</option>
+                    <option value="ME">ME</option>
+                    <option value="CE">CE</option>
                   </select>
                 </div>
               </div>

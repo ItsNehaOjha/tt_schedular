@@ -35,7 +35,8 @@ export const getAllTeachers = asyncHandler(async (req, res, next) => {
       lastName: teacher.lastName,
       displayName: teacher.displayName || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.username,
       department: teacher.department,
-      branch: teacher.createdBy?.branch || 'cse',
+      branch: teacher.createdBy?.branch?.toUpperCase() || 'CSE',
+
       year: teacher.createdBy?.year
     }))
   })

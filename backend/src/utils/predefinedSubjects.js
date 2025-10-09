@@ -8,7 +8,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -18,7 +18,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -28,7 +28,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -38,7 +38,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -48,7 +48,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -58,7 +58,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -68,7 +68,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -78,7 +78,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -88,7 +88,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
 
@@ -100,7 +100,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -110,7 +110,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -120,7 +120,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -130,7 +130,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -140,7 +140,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -150,7 +150,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -160,7 +160,7 @@ export const predefinedSubjects = [
     year: 1,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
 
@@ -172,7 +172,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -182,7 +182,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -192,7 +192,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -202,7 +202,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -212,7 +212,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -222,7 +222,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -232,7 +232,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -242,7 +242,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 1,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
 
@@ -254,7 +254,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -264,7 +264,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -274,7 +274,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -284,7 +284,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -294,7 +294,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -304,7 +304,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -314,7 +314,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -324,7 +324,7 @@ export const predefinedSubjects = [
     year: 2,
     semester: 2,
     credits: 3,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
 
@@ -336,7 +336,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -346,7 +346,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -356,7 +356,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 1,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -366,7 +366,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -376,7 +376,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 1,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
 
@@ -388,7 +388,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -398,7 +398,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -408,7 +408,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 2,
     credits: 4,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -418,7 +418,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 2,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   },
   {
@@ -428,7 +428,7 @@ export const predefinedSubjects = [
     year: 3,
     semester: 2,
     credits: 2,
-    branches: ["cse"],
+    branches: ["CSE"],
     isActive: true
   }
 ]

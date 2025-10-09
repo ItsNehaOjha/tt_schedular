@@ -60,7 +60,7 @@ const timetableSchema = new mongoose.Schema({
   branch: {
     type: String,
     required: [true, 'Branch is required'],
-    enum: ['cse', 'ece', 'eee', 'mech', 'civil', 'it']
+    enum: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']  
   },
   section: {
     type: String,

@@ -12,12 +12,16 @@ const TimetableSelector = ({ onSelect }) => {
 
   const years = ['1st Year', '2nd Year', '3rd Year', '4th Year']
   const branches = [
-    { value: 'cse', label: 'Computer Science' },
-    { value: 'ece', label: 'Electronics' },
-    { value: 'mech', label: 'Mechanical' },
-    { value: 'civil', label: 'Civil' },
-    { value: 'eee', label: 'Electrical' },
-    { value: 'it', label: 'Information Technology' }
+     { value: 'CSE', label: 'Computer Science & Engineering' },
+  { value: 'CS', label: 'Computer Science' },
+  { value: 'Biotechnology', label: 'Biotechnology' },
+  { value: 'CE', label: 'Civil Engineering' },
+  { value: 'IT', label: 'Information Technology' },
+  { value: 'EC', label: 'Electronics & Communication' },
+  { value: 'EE', label: 'Electrical Engineering' },
+  { value: 'ME', label: 'Mechanical Engineering' },
+  { value: 'MBA', label: 'MBA' },
+  { value: 'MCA', label: 'MCA' }
   ]
   const sections = ['A', 'B', 'C', 'D']
   const semesters = ['1', '2', '3', '4', '5', '6', '7', '8']

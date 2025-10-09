@@ -7,7 +7,7 @@ export function SubjectProvider({ children }) {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSubjects = async (branch = "cse") => {
+  const fetchSubjects = async (branch = "CSE") => {
     try {
       setLoading(true);
       const res = await subjectAPI.getSubjects({ branch });

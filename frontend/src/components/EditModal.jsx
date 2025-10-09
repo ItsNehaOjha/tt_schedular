@@ -28,7 +28,7 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
   const [customSubject, setCustomSubject] = useState({ name: '', code: '' })
   const [customTeacher, setCustomTeacher] = useState({ name: '' })
 
-  const getBranch = () => data?.branch || timetableData?.branch || 'cse'
+  const getBranch = () => data?.branch || timetableData?.branch || 'CSE'
   const getYear = () => {
     const yearMap = { '1st Year': 1, '2nd Year': 2, '3rd Year': 3, '4th Year': 4 }
     return yearMap[data?.year || timetableData?.year] || 1

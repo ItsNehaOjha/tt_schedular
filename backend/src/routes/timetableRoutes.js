@@ -22,8 +22,9 @@ const timetableValidation = [
     .isIn(['1st Year', '2nd Year', '3rd Year', '4th Year'])
     .withMessage('Invalid year'),
   body('branch')
-    .isIn(['cse', 'ece', 'eee', 'mech', 'civil', 'it'])
-    .withMessage('Invalid branch'),
+  .isIn(['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'])
+  .withMessage('Invalid branch'),
+
   body('section')
     .isIn(['A', 'B', 'C', 'D'])
     .withMessage('Invalid section'),

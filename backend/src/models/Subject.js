@@ -8,7 +8,7 @@ const subjectSchema = new mongoose.Schema({
   creditHours: { type: Number, default: 3 },
   year: { type: Number, required: true },
   semester: { type: Number, required: true },
-  branches: [{ type: String, enum: ['cse', 'ece', 'eee', 'mech', 'civil', 'it'], default: 'cse' }],
+  branches: [{ type: String, enum: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'], default: 'CSE' }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   isActive: { type: Boolean, default: true }
 }, {

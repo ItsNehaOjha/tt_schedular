@@ -17,7 +17,7 @@ const CoordinatorSubjects = () => {
     year: 1,
     semester: 1,
     credits: 3,
-    branches: ['cse'],
+    branches: ['CSE'],
     type: 'theory'
   })
 
@@ -81,7 +81,7 @@ const CoordinatorSubjects = () => {
       year: subject.year,
       semester: subject.semester,
       credits: subject.credits || 3,
-      branches: subject.branches || ['cse'],
+      branches: subject.branches || ['CSE'],
       type: subject.type || 'theory'
     })
     setShowModal(true)
@@ -108,7 +108,7 @@ const CoordinatorSubjects = () => {
       year: 1,
       semester: 1,
       credits: 3,
-      branches: ['cse'],
+      branches: ['CSE'],
       type: 'theory'
     })
   }
