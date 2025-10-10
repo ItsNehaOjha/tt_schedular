@@ -47,7 +47,7 @@ const LandingPage = () => {
           className="text-center mb-12"
         >
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Timetable Management System
+            Smart Timetable Tracker
           </h1>
           <p className="text-xl text-gray-600">
             Select your role to continue
