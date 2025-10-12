@@ -1,31 +1,35 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Users, Loader, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Users, Loader, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import api from '../../utils/api'
 
 const TeacherPage = () => {
   const navigate = useNavigate()
+
   const [teachers, setTeachers] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Branch filter
   const [selectedBranch, setSelectedBranch] = useState('CSE')
   const [branchOptions] = useState([
-    { value: 'CSE', label: 'Computer Science & Engineering' },
-  { value: 'CS', label: 'Computer Science' },
-  { value: 'Biotechnology', label: 'Biotechnology' },
-  { value: 'CE', label: 'Civil Engineering' },
-  { value: 'IT', label: 'Information Technology' },
-  { value: 'EC', label: 'Electronics & Communication' },
-  { value: 'EE', label: 'Electrical Engineering' },
-  { value: 'ME', label: 'Mechanical Engineering' },
-  { value: 'MBA', label: 'MBA' },
-  { value: 'MCA', label: 'MCA' }
+    { value: 'APPLIED', label: 'Applied Science' },
+    { value: 'CSE',     label: 'Computer Science & Engineering' },
+    { value: 'CS',      label: 'Computer Science' },
+    { value: 'CSD',     label: 'Computer Science & Design' },
+    { value: 'IT',      label: 'Information Technology' },
+    { value: 'ECE',     label: 'Electronics & Communication' },
+    { value: 'ME',      label: 'Mechanical Engineering' },
+    { value: 'MBA',     label: 'MBA' },
+    { value: 'MCA',     label: 'MCA' },
   ])
-  const [selectedTeacher, setSelectedTeacher] = useState({
-    name: '',
-    id: ''
-  })
+
+  // 🔎 Search filter (local)
+  const [query, setQuery] = useState('')
+
+  // Selected teacher
+  const [selectedTeacher, setSelectedTeacher] = useState({ name: '', id: '' })
 
   useEffect(() => {
     fetchTeachers()
@@ -34,16 +38,17 @@ const TeacherPage = () => {
   const fetchTeachers = async () => {
     try {
       setLoading(true)
-      const url = selectedBranch 
-        ? `/teachers/all?branch=${selectedBranch}`
-        : '/teachers/all'
-      
-      const response = await api.get(url)
-      setTeachers(response.data.data || [])
-      
-      // Don't show toast for no teachers found as UI already handles it
-    } catch (error) {
-      console.error('Error fetching teachers:', error)
+      const { data } = await api.get('/teachers/list')
+      const all = data?.data || []
+
+      // Branch filter (case-insensitive)
+      const filtered = all.filter(t =>
+        (t.department || '').toUpperCase() === selectedBranch.toUpperCase()
+      )
+
+      setTeachers(filtered)
+    } catch (err) {
+      console.error('Error fetching teachers:', err)
       toast.error('Failed to load teachers')
       setTeachers([])
     } finally {
@@ -51,25 +56,47 @@ const TeacherPage = () => {
     }
   }
 
-  const handleTeacherSelect = (teacher) => {
-    setSelectedTeacher({
-      name: teacher.displayName || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.username,
-      id: teacher.id
+  const normalize = (s) => (s || '').toString().toLowerCase().replace(/\s+/g, ' ').trim()
+
+  // 🔍 Search across name + username + teacherId
+  const visibleTeachers = useMemo(() => {
+    const q = normalize(query)
+    if (!q) return teachers
+
+    return teachers.filter(t => {
+      const name =
+        t.name ||
+        t.displayName ||
+        `${t.firstName || ''} ${t.lastName || ''}`.trim()
+
+      const haystack = `${name} ${t.username || ''} ${t.teacherId || ''}`
+      return normalize(haystack).includes(q)
     })
+  }, [teachers, query])
+
+  const handleTeacherSelect = (t) => {
+    const name =
+      t.name ||
+      t.displayName ||
+      `${t.firstName || ''} ${t.lastName || ''}`.trim() ||
+      t.username ||
+      'Unknown Teacher'
+
+    setSelectedTeacher({ name, id: t.id || t._id })
   }
 
   const handleViewTimetable = () => {
     if (selectedTeacher.name && selectedTeacher.id) {
-      navigate('/teacher/dashboard', { 
-        state: { 
-          teacherName: selectedTeacher.name, 
-          teacherId: selectedTeacher.id 
-        } 
+      navigate('/teacher/dashboard', {
+        state: {
+          teacherName: selectedTeacher.name,
+          teacherId: selectedTeacher.id,
+        },
       })
     }
   }
 
-  const isFormValid = selectedTeacher.name && selectedTeacher.id
+  const isFormValid = Boolean(selectedTeacher.name && selectedTeacher.id)
 
   if (loading) {
     return (
@@ -106,7 +133,7 @@ const TeacherPage = () => {
           </div>
         </motion.div>
 
-        {/* Form */}
+        {/* Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -120,72 +147,102 @@ const TeacherPage = () => {
               </label>
               <select
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
+                onChange={(e) => {
+                  setSelectedBranch(e.target.value)
+                  setQuery('')               // reset search when branch changes
+                  setSelectedTeacher({ name: '', id: '' }) // reset selection
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
-                {branchOptions.map(branch => (
-                  <option key={branch.value} value={branch.value}>{branch.label}</option>
+                {branchOptions.map(b => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
                 ))}
               </select>
             </div>
 
-            {/* Teacher Selection */}
+            {/* Search Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search Teacher
+              </label>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Type name, username, or ID (e.g., Tushar, mr.tushar, CSE-043)…"
+                  className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && visibleTeachers.length > 0) {
+                      handleTeacherSelect(visibleTeachers[0])
+                    }
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                Showing {visibleTeachers.length} of {teachers.length} teachers
+              </p>
+            </div>
+
+            {/* Teacher List */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Teacher
               </label>
-              {teachers.length === 0 ? (
+
+              {visibleTeachers.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {selectedBranch ? `No teachers found for ${branchOptions.find(b => b.value === selectedBranch)?.label || selectedBranch} branch` : 'No teachers found'}
-                  </p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Please contact the coordinator to initialize teachers for this branch.
-                  </p>
+                  <p className="text-gray-500">No matching teachers found</p>
                   <button
                     onClick={fetchTeachers}
                     className="mt-4 text-green-600 hover:text-green-500 flex items-center mx-auto"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Retry
+                    Refresh
                   </button>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  // Update the teacher display to show proper names
-                  {teachers.map((teacher) => (
-                    <div
-                      key={teacher.id}
-                      onClick={() => handleTeacherSelect(teacher)}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedTeacher.id === teacher.id
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="font-medium text-gray-900">
-                            {teacher.displayName || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.username}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {teacher.username} • {teacher.branch || teacher.department || 'CSE'}
-                          </p>
-                          {teacher.designation && (
-                            <p className="text-xs text-gray-400">{teacher.designation}</p>
-                          )}
+                  {visibleTeachers.map((t) => {
+                    const id = t.id || t._id
+                    const selected = selectedTeacher.id === id
+                    const name =
+                      t.name ||
+                      t.displayName ||
+                      `${t.firstName || ''} ${t.lastName || ''}`.trim() ||
+                      t.username ||
+                      'Unknown Teacher'
+
+                    return (
+                      <div
+                        key={id}
+                        onClick={() => handleTeacherSelect(t)}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selected ? 'border-green-500 bg-green-50'
+                                   : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {(t.teacherId || '').trim()} {t.teacherId ? '• ' : ''}{t.department || 'N/A'}
+                            </p>
+                            {t.designation && (
+                              <p className="text-xs text-gray-400">{t.designation}</p>
+                            )}
+                          </div>
+                          {selected && <div className="w-4 h-4 bg-green-500 rounded-full" />}
                         </div>
-                        {selectedTeacher.id === teacher.id && (
-                          <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               onClick={handleViewTimetable}
               disabled={!isFormValid}

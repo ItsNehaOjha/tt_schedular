@@ -14,7 +14,7 @@ const CoordinatorClasses = () => {
     branch: 'CSE',
     section: 'A',
     semester: 1,
-    academicYear: '2024-25'
+    academicYear: '2025-26'
   })
 
   useEffect(() => {
@@ -85,7 +85,7 @@ const CoordinatorClasses = () => {
       branch: 'CSE',
       section: 'A',
       semester: 1,
-      academicYear: '2024-25'
+      academicYear: '2025-26'
     })
   }
 
@@ -99,10 +99,10 @@ const CoordinatorClasses = () => {
 
   // Mock data for demonstration
   const mockClasses = [
-    { id: 1, year: 1, branch: 'CSE', section: 'A', semester: 1, academicYear: '2024-25', students: 60 },
-    { id: 2, year: 1, branch: 'CSE', section: 'B', semester: 1, academicYear: '2024-25', students: 58 },
-    { id: 3, year: 2, branch: 'CSE', section: 'A', semester: 3, academicYear: '2024-25', students: 55 },
-    { id: 4, year: 2, branch: 'CSE', section: 'B', semester: 3, academicYear: '2024-25', students: 57 },
+    { id: 1, year: 1, branch: 'CSE', section: 'A', semester: 1, academicYear: '2025-26', students: 60 },
+    { id: 2, year: 1, branch: 'CSE', section: 'B', semester: 1, academicYear: '2025-26', students: 58 },
+    { id: 3, year: 2, branch: 'CSE', section: 'A', semester: 3, academicYear: '2025-26', students: 55 },
+    { id: 4, year: 2, branch: 'CSE', section: 'B', semester: 3, academicYear: '2025-26', students: 57 },
   ]
 
   return (
@@ -253,7 +253,7 @@ const CoordinatorClasses = () => {
                   value={formData.academicYear}
                   onChange={handleInputChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="2024-25"
+                  placeholder="2025-26"
                 />
               </div>
               <div className="flex justify-end space-x-3">

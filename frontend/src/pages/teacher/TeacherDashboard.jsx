@@ -12,6 +12,7 @@ const TeacherDashboard = () => {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [academicYear, setAcademicYear] = useState('')
 
   const { teacherName, teacherId } = location.state || {}
 
@@ -23,8 +24,7 @@ const TeacherDashboard = () => {
 
     fetchTeacherSchedule()
     fetchNotifications()
-    
-    // Auto-refresh every 5 minutes
+
     const interval = setInterval(() => {
       fetchTeacherSchedule(true)
       fetchNotifications()
@@ -35,18 +35,16 @@ const TeacherDashboard = () => {
 
   const fetchTeacherSchedule = async (isRefresh = false) => {
     try {
-      if (isRefresh) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
-      
+      if (isRefresh) setRefreshing(true)
+      else setLoading(true)
+
       const response = await timetableAPI.getTeacherTimetable(teacherId)
-      setTeacherSchedule(response.data)
-      
-      if (isRefresh) {
-        toast.success('Schedule refreshed')
-      }
+      const payload = response.data?.data || {}
+
+      setTeacherSchedule(payload.grid) // {days, timeSlots, schedule}
+      setAcademicYear(payload.meta?.latestAcademicYear || '')
+
+      if (isRefresh) toast.success('Schedule refreshed')
     } catch (error) {
       console.error('Error fetching teacher schedule:', error)
       if (error.response?.status === 404) {
@@ -69,18 +67,8 @@ const TeacherDashboard = () => {
     }
   }
 
-  const handleDownloadPDF = () => {
-    // PDF export functionality
-    toast.success('PDF download started')
-  }
-
-  const handleRefresh = () => {
-    fetchTeacherSchedule(true)
-    fetchNotifications()
-  }
-
   const renderScheduleGrid = () => {
-    if (!teacherSchedule || !teacherSchedule.length) {
+    if (!teacherSchedule || !teacherSchedule.days || !teacherSchedule.timeSlots) {
       return (
         <div className="p-6 text-center">
           <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -92,20 +80,7 @@ const TeacherDashboard = () => {
       )
     }
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const timeSlots = [
-      '9:00-10:00', '10:00-11:00', '11:15-12:15', '12:15-1:15',
-      '2:15-3:15', '3:15-4:15', '4:30-5:30'
-    ]
-
-    // Group schedule by day and time
-    const scheduleGrid = {}
-    teacherSchedule.forEach(slot => {
-      if (!scheduleGrid[slot.day]) {
-        scheduleGrid[slot.day] = {}
-      }
-      scheduleGrid[slot.day][slot.timeSlot] = slot
-    })
+    const { days, timeSlots, schedule } = teacherSchedule
 
     return (
       <div className="overflow-x-auto">
@@ -127,19 +102,30 @@ const TeacherDashboard = () => {
                   {timeSlot}
                 </td>
                 {days.map(day => {
-                  const slot = scheduleGrid[day]?.[timeSlot]
+                  const cell = schedule[day]?.[timeSlot]
+
                   return (
                     <td key={`${day}-${timeSlot}`} className="border border-gray-300 p-2">
-                      {slot ? (
+                      {!cell ? (
+                        <div className="h-16"></div>
+                      ) : Array.isArray(cell) ? (
+                        cell.map((c, i) => (
+                          <div key={i} className="bg-blue-100 rounded p-2 text-sm mb-1">
+                            <div className="font-semibold text-blue-900">{c.subject}</div>
+                            <div className="text-blue-700">{c.class}</div>
+                            <div className="text-blue-600 text-xs">
+                              {c.type} • {c.room}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
                         <div className="bg-blue-100 rounded p-2 text-sm">
-                          <div className="font-semibold text-blue-900">{slot.subject}</div>
-                          <div className="text-blue-700">{slot.class}</div>
+                          <div className="font-semibold text-blue-900">{cell.subject}</div>
+                          <div className="text-blue-700">{cell.class}</div>
                           <div className="text-blue-600 text-xs">
-                            {slot.type} • {slot.room}
+                            {cell.type} • {cell.room}
                           </div>
                         </div>
-                      ) : (
-                        <div className="h-16"></div>
                       )}
                     </td>
                   )
@@ -166,7 +152,6 @@ const TeacherDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -183,63 +168,11 @@ const TeacherDashboard = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 Teaching Schedule - {teacherName}
               </h1>
-              <p className="text-gray-600">Academic Year 2024-25</p>
+              <p className="text-gray-600">Academic Year {academicYear || '—'}</p>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-6 h-6 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <div className="relative">
-              <button className="p-2 rounded-lg hover:bg-gray-200 transition-colors">
-                <Bell className="w-6 h-6 text-gray-600" />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-            </div>
-            <button
-              onClick={handleDownloadPDF}
-              className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </button>
           </div>
         </motion.div>
 
-        {/* Notifications */}
-        {notifications.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-semibold text-green-900 mb-2">Notifications</h3>
-              <div className="space-y-2">
-                {notifications.slice(0, 3).map((notification) => (
-                  <div key={notification._id} className="text-sm text-green-800">
-                    <span className="font-medium">{notification.title}</span>
-                    {notification.message && <span className="ml-2">{notification.message}</span>}
-                  </div>
-                ))}
-                {notifications.length > 3 && (
-                  <p className="text-xs text-green-600">+{notifications.length - 3} more notifications</p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Teaching Schedule Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -247,32 +180,6 @@ const TeacherDashboard = () => {
         >
           {renderScheduleGrid()}
         </motion.div>
-
-        {/* Summary Stats */}
-        {teacherSchedule && teacherSchedule.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4"
-          >
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Total Classes</h3>
-              <p className="text-2xl font-bold text-green-600">{teacherSchedule.length}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Subjects</h3>
-              <p className="text-2xl font-bold text-green-600">
-                {new Set(teacherSchedule.map(s => s.subject)).size}
-              </p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Classes Taught</h3>
-              <p className="text-2xl font-bold text-green-600">
-                {new Set(teacherSchedule.map(s => s.class)).size}
-              </p>
-            </div>
-          </motion.div>
-        )}
       </div>
     </div>
   )

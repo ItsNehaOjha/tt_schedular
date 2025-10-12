@@ -125,7 +125,7 @@ const TimetableSelector = ({ onSelect }) => {
           name="academicYear"
           value={formData.academicYear}
           onChange={handleChange}
-          placeholder="e.g., 2024-25"
+          placeholder="e.g., 2025-26"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           required
         />

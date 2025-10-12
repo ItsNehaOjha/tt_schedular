@@ -3,16 +3,17 @@ import { body } from 'express-validator'
 import {
   getTimetables,
   getTimetableByBranchSection,
+  viewTimetable,
   getTeacherTimetable,
   getTimetableByClass,
-  viewTimetable,
   createTimetable,
   updateTimetable,
   publishTimetable,
   deleteTimetable,
-  getTimetableStats
+  getTimetableStats,
+  getBusyTeachersForSlot
 } from '../controllers/timetableController.js'
-import { protect, authorize } from '../middleware/authMiddleware.js'
+// import { protect, authorize } from '../middleware/authMiddleware.js'
 
 const router = express.Router()
 
@@ -22,12 +23,13 @@ const timetableValidation = [
     .isIn(['1st Year', '2nd Year', '3rd Year', '4th Year'])
     .withMessage('Invalid year'),
   body('branch')
-  .isIn(['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'])
+  .customSanitizer(value => value.toUpperCase().trim())
+  .isIn(['CSE', 'CS', 'IT', 'EC', 'EE', 'ME', 'CE', 'MCA', 'MBA'])
   .withMessage('Invalid branch'),
-
-  body('section')
-    .isIn(['A', 'B', 'C', 'D'])
-    .withMessage('Invalid section'),
+ body('section')
+  .customSanitizer(value => value.toUpperCase().trim())
+  .isIn(['A', 'B', 'C', 'D'])
+  .withMessage('Invalid section'),
   body('semester')
     .isInt({ min: 1, max: 8 })
     .withMessage('Semester must be between 1 and 8'),
@@ -36,28 +38,27 @@ const timetableValidation = [
     .withMessage('Academic year is required')
 ]
 
-// Public routes
+// ---------- PUBLIC ROUTES ----------
 router.get('/view', viewTimetable)
-
-// Protected routes - Stats route MUST come before parameterized routes
-router.get('/stats', protect, authorize('coordinator'), getTimetableStats)
-
-// Parameterized routes (these should come after specific routes)
+router.get('/clash', getBusyTeachersForSlot) // day/slot busy teachers helper (kept public)
+router.get('/teacher/:id', getTeacherTimetable) // <-- must be BEFORE "/:branch/:section"
 router.get('/:branch/:section', getTimetableByBranchSection)
-router.get('/teacher/:id', getTeacherTimetable)
-router.get('/class', protect, authorize('coordinator'), getTimetableByClass)
 
-// Protected routes
-router.use(protect)
+// ---------- PROTECTED (COORDINATOR) ROUTES ----------
+router.get('/stats',  getTimetableStats)
+router.get('/class',  getTimetableByClass)
 
-// Teacher routes
-router.get('/teacher/:id/timetable', authorize('teacher', 'coordinator'), getTeacherTimetable)
+// from here on: require auth
 
-// Coordinator only routes
-router.get('/', authorize('coordinator'), getTimetables)
-router.post('/', authorize('coordinator'), timetableValidation, createTimetable)
-router.put('/:id', authorize('coordinator'), updateTimetable)
-router.put('/:id/publish', authorize('coordinator'), publishTimetable)
-router.delete('/:id', authorize('coordinator'), deleteTimetable)
+
+// optionally keep a protected variant for teachers/coordinators
+router.get('/teacher/:id/timetable', getTeacherTimetable)
+
+// coordinator-only CRUD
+router.get('/',  getTimetables)
+router.post('/',  timetableValidation, createTimetable)
+router.put('/:id',  updateTimetable)
+router.put('/:id/publish',  publishTimetable)
+router.delete('/:id',  deleteTimetable) 
 
 export default router

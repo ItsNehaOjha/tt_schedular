@@ -23,6 +23,45 @@ const CoordinatorTimetable = () => {
     if (response.data?.year) return response.data
     return response
   }
+  // src/pages/coordinator/CoordinatorTimetable.jsx
+// ...imports unchanged...
+
+// inside component:
+
+// === Fetch existing timetable ===
+const fetchExistingTimetable = async (classData) => {
+  try {
+    setLoading(true)
+    // FIX: use viewTimetable instead of /timetable/class (404)
+    const response = await timetableAPI.viewTimetable({
+      year: classData.year,
+      branch: classData.branch,
+      section: classData.section,
+      semester: classData.semester,
+      academicYear: classData.academicYear
+    })
+    const data = unwrapResponse(response)
+    if (data) {
+      setTimetableData(data)
+      setSavedTimetableId(data._id || data.id)
+      setIsPublished(Boolean(data.isPublished))
+    } else {
+      setTimetableData(null)
+      setSavedTimetableId(null)
+      setIsPublished(false)
+    }
+  } catch (err) {
+    console.error('Fetch timetable error:', err)
+    if (err.response?.status === 404) {
+      setTimetableData(null)
+    } else {
+      toast.error('Failed to fetch timetable')
+    }
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   // === Load saved state & fetch backend version ===
   useEffect(() => {
@@ -75,37 +114,7 @@ const CoordinatorTimetable = () => {
   }, [currentStep, selectedClass, timetableData])
 
   // === Fetch existing timetable ===
-  const fetchExistingTimetable = async (classData) => {
-    try {
-      setLoading(true)
-      const response = await timetableAPI.getTimetableByClass({
-        year: classData.year,
-        branch: classData.branch,
-        section: classData.section,
-        semester: classData.semester,
-        academicYear: classData.academicYear
-      })
-      const data = unwrapResponse(response)
-      if (data) {
-        setTimetableData(data)
-        setSavedTimetableId(data._id || data.id)
-        setIsPublished(Boolean(data.isPublished))
-      } else {
-        setTimetableData(null)
-        setSavedTimetableId(null)
-        setIsPublished(false)
-      }
-    } catch (err) {
-      console.error('Fetch timetable error:', err)
-      if (err.response?.status === 404) {
-        setTimetableData(null)
-      } else {
-        toast.error('Failed to fetch timetable')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+ 
 
   const handleClassSelection = async (classData) => {
     setSelectedClass(classData)

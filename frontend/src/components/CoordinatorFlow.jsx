@@ -76,7 +76,7 @@ const CoordinatorFlow = ({ user, onLogout }) => {
       branch,
       section,
       semester: Math.floor(Math.random() * 8 + 1),
-      academicYear: '2024-25',
+      academicYear: '2025-26',
       schedule: timetable,
       timeSlots,
       days,
@@ -118,7 +118,7 @@ const CoordinatorFlow = ({ user, onLogout }) => {
         branch: selectedTimetable.branch,
         section: selectedTimetable.section,
         semester: selectedTimetable.semester || 1,
-        academicYear: selectedTimetable.academicYear || '2024-25',
+        academicYear: selectedTimetable.academicYear || '2025-26',
         schedule: scheduleData
       }
 

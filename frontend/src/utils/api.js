@@ -12,18 +12,29 @@ const api = axios.create({
 axios.defaults.withCredentials = true;
 
 // Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
+    const status = error.response?.status
+    const url = error.config?.url || ''
+    const path = window.location?.pathname || ''
+
+    const isCoordinatorRequest =
+      url.includes('/coordinator') ||
+      url.includes('/auth') ||
+      path.startsWith('/coordinator')
+
+    if (status === 401 && isCoordinatorRequest) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/coordinator/login'
+      return
+    }
+    // For public pages, just surface the error without redirect
     return Promise.reject(error)
   }
 )
+
 
 // Response interceptor
 api.interceptors.response.use(
@@ -51,7 +62,7 @@ export const authAPI = {
 
 // Teacher API - Updated to match cleaned backend
 export const teacherAPI = {
-  getAllTeachers: () => api.get('/teachers/all'),
+  getAllTeachers: () => api.get('/teachers/list'),
   getTeacherById: (id) => api.get(`/teachers/${id}`),
   // Coordinator routes for teacher management
   getTeachers: () => api.get('/coordinator/teachers'),

@@ -6,6 +6,12 @@ const scheduleSlotSchema = new mongoose.Schema({
     
     enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   },
+  // add in scheduleSlotSchema:
+slotKey: {
+  type: String,  // TS1, TS2, LUNCH, ...
+  trim: true
+},
+
   timeSlot: {
     type: String,
     
@@ -81,6 +87,7 @@ const timetableSchema = new mongoose.Schema({
   type: Number,
   default: 1
 },
+
 revisionHistory: [
   {
     version: Number,
@@ -100,7 +107,7 @@ revisionHistory: [
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    default: null
   },
   lastModifiedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -117,9 +124,14 @@ timetableSchema.index(
 );
 
 
+
 // Index for faster queries
 timetableSchema.index({ isPublished: 1 })
 timetableSchema.index({ createdBy: 1 })
+
+timetableSchema.index(
+  { 'schedule.day': 1, 'schedule.slotKey': 1, 'schedule.teacher.id': 1 }
+);
 
 const Timetable = mongoose.model('Timetable', timetableSchema)
 

@@ -223,7 +223,8 @@
                 subject: slot.subject?.acronym || slot.subject?.name || '',
                 teacher: slot.teacher?.name || '',
                 teacherId: slot.teacher?.id || null,
-                teacherUsername: slot.teacher?.username || '',
+                isLabSession: slot.type === 'lab',
+                requiresMultipleSlots: slot.type === 'lab', 
                 type: slot.type || 'lecture',
                 room: slot.room || '',
                 code: slot.subject?.code || '',
@@ -344,8 +345,7 @@
             newSchedule[editingCell.day][editingCell.timeSlot] = {
               subject: cellData.subject,
               teacher: cellData.teacher,
-              teacherId: cellData.teacherId,
-              teacherUsername: cellData.teacherUsername,
+              teacherId: cellData.teacherId || null,
               type: cellData.type,
               room: cellData.room,
               code: cellData.code,
@@ -354,14 +354,14 @@
             newSchedule[editingCell.day][nextSlot] = {
               subject: `${cellData.subject} (Cont.)`,
               teacher: cellData.teacher,
-              teacherId: cellData.teacherId,
-              teacherUsername: cellData.teacherUsername,
+              teacherId: cellData.teacherId || null,
               type: cellData.type,
               room: cellData.room,
               code: cellData.code,
               name: cellData.name,
               isContinuation: true
             }
+
             setScheduleData(newSchedule)
             setEditingCell(null)
             return
@@ -380,12 +380,12 @@
         subject: cellData.subject || '',
         teacher: cellData.teacher || '',
         teacherId: cellData.teacherId || null,
-        teacherUsername: cellData.teacherUsername || '',
         type: cellData.type || 'lecture',
         room: cellData.room || '',
         code: cellData.code || '',
         name: cellData.name || cellData.subject || ''
       }
+
 
       newSchedule[editingCell.day][editingCell.timeSlot] = updatedCellData
       setScheduleData(newSchedule)
@@ -630,7 +630,9 @@
           const cellData = scheduleData[day]?.[timeSlot]
           if (cellData && (cellData.subject || cellData.teacher || isSpecialEntry(cellData.subject, cellData.type))) {
             const subjectData = { acronym: cellData.subject || '', code: cellData.code || '', name: cellData.name || cellData.subject || '' }
-            const teacherData = isSpecialEntry(cellData.subject, cellData.type) ? { id: null, name: '', username: '' } : { id: cellData.teacherId || null, name: cellData.teacher || '', username: cellData.teacherUsername || '' }
+            const teacherData = isSpecialEntry(cellData.subject, cellData.type)
+                ? { id: null, name: '' }
+                : { id: cellData.teacherId || null, name: cellData.teacher || '' }
             scheduleArray.push({ day, timeSlot, subject: subjectData, teacher: teacherData, type: cellData.type || 'lecture', room: cellData.room || '' })
           }
         })
@@ -682,7 +684,9 @@
             const cellData = scheduleData[day]?.[timeSlot]
             if (cellData && (cellData.subject || cellData.teacher || isSpecialEntry(cellData.subject, cellData.type))) {
               const subjectData = { acronym: cellData.subject || '', code: cellData.code || '', name: cellData.name || cellData.subject || '' }
-              const teacherData = isSpecialEntry(cellData.subject, cellData.type) ? { id: null, name: '', username: '' } : { id: cellData.teacherId || null, name: cellData.teacher || '', username: cellData.teacherUsername || '' }
+              const teacherData = isSpecialEntry(cellData.subject, cellData.type)
+                  ? { id: null, name: '' }
+                  : { id: cellData.teacherId || null, name: cellData.teacher || '' }
               scheduleArray.push({ day, timeSlot, subject: subjectData, teacher: teacherData, type: cellData.type || 'lecture', room: cellData.room || '' })
             }
           })
@@ -947,7 +951,7 @@
                 <option value="7">Semester 7</option>
                 <option value="8">Semester 8</option>
               </select>
-              <input type="text" placeholder="Academic Year (e.g., 2024-25)" value={timetableInfo.academicYear} onChange={(e) => setTimetableInfo(prev => ({ ...prev, academicYear: e.target.value }))} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" placeholder="Academic Year (e.g., 2025-26)" value={timetableInfo.academicYear} onChange={(e) => setTimetableInfo(prev => ({ ...prev, academicYear: e.target.value }))} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
         )}

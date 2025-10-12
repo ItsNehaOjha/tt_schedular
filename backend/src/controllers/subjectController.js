@@ -27,6 +27,8 @@ export const getSubjects = asyncHandler(async (req, res, next) => {
   })
 })
 
+
+
 // @desc    Initialize predefined subjects
 // @route   POST /api/subjects/initialize
 // @access  Private (Coordinator only)

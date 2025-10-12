@@ -4,6 +4,8 @@ import Timetable from '../models/Timetable.js'
 import User from '../models/User.js'
 import { AppError, asyncHandler } from '../utils/errorHandler.js'
 import { createTimetableNotification } from './notificationController.js'
+import mongoose from 'mongoose';
+
 
 /* ============================================================
    🟢 GET ALL TIMETABLES (for Coordinators)
@@ -52,7 +54,7 @@ export const getTimetableByBranchSection = asyncHandler(async (req, res, next) =
   const { branch, section } = req.params
   const { year } = req.query
 
-  if (!year) return next(new AppError('Year parameter is required', 400))
+  
 
   const timetable = await Timetable.findOne({
     year,
@@ -61,7 +63,14 @@ export const getTimetableByBranchSection = asyncHandler(async (req, res, next) =
     isPublished: true
   }).populate('createdBy', 'username firstName lastName')
 
-  if (!timetable) return next(new AppError('No published timetable found for this class', 404))
+  if (!timetable) {
+  return res.status(200).json({
+    success: true,
+    data: null,
+    message: 'No published timetable yet'
+  });
+}
+
 
   const days = [...new Set(timetable.schedule.map(s => s.day))].filter(Boolean)
   const timeSlots = [...new Set(timetable.schedule.map(s => s.timeSlot))].filter(Boolean)
@@ -99,7 +108,14 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
     isPublished: true
   }).populate('createdBy', 'username firstName lastName')
 
-  if (!timetable) return next(new AppError('No published timetable found for this class', 404))
+  if (!timetable) {
+  return res.status(200).json({
+    success: true,
+    data: null,
+    message: 'No published timetable yet'
+  });
+}
+
 
   const days = [...new Set(timetable.schedule.map(s => s.day))].filter(Boolean)
   const timeSlots = [...new Set(timetable.schedule.map(s => s.timeSlot))].filter(Boolean)
@@ -115,53 +131,188 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
    Route: GET /api/timetable/teacher/:id
    Access: Public or Protected
 ============================================================ */
-export const getTeacherTimetable = asyncHandler(async (req, res, next) => {
-  const { id } = req.params
-
-  const teacher = await User.findById(id)
-  if (!teacher) return next(new AppError('Teacher not found', 404))
-
-  const timetables = await Timetable.find({
-    'schedule.teacher.id': id,
-    isPublished: true
-  }).populate('createdBy', 'username firstName lastName')
-
-  const teacherSchedule = []
-  timetables.forEach(timetable => {
-    timetable.schedule.forEach(slot => {
-      if (slot.teacher.id && slot.teacher.id.toString() === id) {
-        teacherSchedule.push({
-          day: slot.day,
-          timeSlot: slot.timeSlot,
-          subject: slot.subject,
-          type: slot.type,
-          room: slot.room,
-          class: `${timetable.year} ${timetable.branch.toUpperCase()} ${timetable.section}`,
-          timetableId: timetable._id,
-          academicYear: timetable.academicYear
-        })
-      }
-    })
-  })
-
-  const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  teacherSchedule.sort((a, b) => {
-    const dayDiff = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
-    if (dayDiff !== 0) return dayDiff
-    return a.timeSlot.localeCompare(b.timeSlot)
-  })
-
-  res.status(200).json({
-    success: true,
-    count: teacherSchedule.length,
-    data: teacherSchedule,
-    teacher: {
-      id: teacher._id,
-      name: teacher.displayName || `${teacher.firstName} ${teacher.lastName}`.trim(),
-      username: teacher.username
+export const getBusyTeachersForSlot = async (req, res) => {
+  try {
+    const { day, slotKey, timeSlot, branch, year, section } = req.query
+    if (!day || (!slotKey && !timeSlot)) {
+      return res.status(400).json({ success: false, message: 'day and slotKey|timeSlot required' })
     }
-  })
-})
+    const slot = slotKey || timeSlot
+
+    const match = { 'schedule.day': day, 'schedule.timeSlot': slot }
+    if (branch) match.branch = branch
+    if (year) match.year = year
+    if (section) match.section = section
+
+    const agg = [
+      { $match: match },
+      { $unwind: '$schedule' },
+      { $match: { 'schedule.day': day, 'schedule.timeSlot': slot } },
+      {
+        $project: {
+          teacherId1: '$schedule.teacher.id',
+          teacherId2: '$schedule.teacher._id',
+          teacherId3: '$schedule.teacherId',
+          teacherUsername: '$schedule.teacher.username',
+          teacherName: '$schedule.teacher.name'
+        }
+      },
+      {
+        $addFields: {
+          teacherCandidate: {
+            $ifNull: ['$teacherId1', { $ifNull: ['$teacherId2', '$teacherId3'] }]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          teachers: { $addToSet: '$teacherCandidate' },
+          usernames: { $addToSet: '$teacherUsername' }
+        }
+      }
+    ]
+
+    const out = await Timetable.aggregate(agg).allowDiskUse(true)
+    const rawList = (out[0]?.teachers || []).filter(Boolean).map(String)
+    const usernames = (out[0]?.usernames || []).filter(Boolean).map(String)
+    // prefer DB ids, but return both fields so frontend can choose
+    return res.json({ success: true, busyTeachers: rawList, busyTeacherUsernames: usernames })
+  } catch (err) {
+    console.error('getBusyTeachersForSlot error', err)
+    return res.status(500).json({ success: false, message: err.message || 'Server error' })
+  }
+}
+
+/**
+ * GET /api/timetable/teacher/:id  OR /api/timetable/teacher?teacherId=<idOrUsername>
+ * Returns timetable entries for a teacher across timetables. If route param is 'all' respond with message.
+ *
+ * This function is tolerant and looks for:
+ * - schedule.teacher.id (db object id string)
+ * - schedule.teacher._id
+ * - schedule.teacherId (custom teacher short id)
+ * - schedule.teacher.username
+ *
+ * Returns structure:
+ *  { success: true, data: [ { timetableId, branch, year, section, academicYear, entries: [ { day, timeSlot, subject, type, room, teacher... } ] } ] }
+ */
+// backend/src/controllers/timetableController.js
+
+
+// GET TEACHER TIMETABLE (Flexible Matching)
+export const getTeacherTimetable = asyncHandler(async (req, res) => {
+  const lookup = req.params.id || req.query.teacherId || req.query.id || req.query.name;
+  if (!lookup) throw new AppError('Teacher ID or Name is required', 400);
+
+  // 1) Find teacher by ID, teacherId, or name (Flexible)
+  const teacher = await User.findOne({
+    role: 'teacher',
+    $or: [
+      mongoose.isValidObjectId(lookup) ? { _id: lookup } : null,
+      { teacherId: lookup },
+      { normalizedName: new RegExp(lookup.toLowerCase(), 'i') },
+      { displayName: new RegExp(lookup, 'i') }
+    ].filter(Boolean)
+  }).lean();
+
+  if (!teacher) throw new AppError('Teacher not found', 404);
+
+  // 2) Find ALL published timetables where teacher is present (Flexible matching in schedule)
+  const tts = await Timetable.find({
+    isPublished: true,
+    $or: [
+      { 'schedule.teacher.id': teacher._id },                // Match by MongoDB _id
+      { 'schedule.teacherId': teacher.teacherId },          // Match by custom teacherId
+      { 'schedule.teacher.name': new RegExp(teacher.firstName.split(' ')[0], 'i') } // Match by partial name (e.g. "Tushar")
+    ]
+  }).sort({ publishedAt: -1, updatedAt: -1 }).lean();
+
+  if (!tts.length) {
+    return res.status(404).json({ success: false, message: 'No teaching schedule found' });
+  }
+
+  // 3) Extract matching schedule entries
+  const entries = [];
+  for (const tt of tts) {
+    for (const s of tt.schedule || []) {
+      const match =
+        (s?.teacher?.id && String(s.teacher.id) === String(teacher._id)) ||
+        (s?.teacher?.name && new RegExp(teacher.firstName.split(' ')[0], 'i').test(s.teacher.name)) ||
+        (s?.teacherId && s.teacherId === teacher.teacherId);
+
+      if (!match) continue;
+
+      entries.push({
+        timetableId: tt._id,
+        academicYear: tt.academicYear,
+        semester: tt.semester,
+        branch: tt.branch,
+        year: tt.year,
+        section: tt.section,
+        day: s.day,
+        slotKey: s.slotKey || null,
+        timeSlot: s.timeSlot || '',
+        subject: s.subject?.name || s.subject?.acronym || '',
+        class: `${tt.year} ${tt.branch} ${tt.section}`,
+        room: s.room || '',
+        type: s.type || 'lecture',
+      });
+    }
+  }
+
+  if (!entries.length) {
+    return res.status(404).json({ success: false, message: 'No teaching schedule found' });
+  }
+
+  // 4) Build days and timeslot grid
+  const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const timeSlotSet = [...new Set(entries.map(e => e.timeSlot))];
+  const timeSlots = timeSlotSet;
+  const days = DAY_ORDER.filter(d => entries.some(e => e.day === d));
+
+  const scheduleGrid = {};
+  for (const d of days) {
+    scheduleGrid[d] = {};
+    for (const t of timeSlots) scheduleGrid[d][t] = null;
+  }
+
+  for (const e of entries) {
+    if (!scheduleGrid[e.day]) continue;
+    const slot = e.timeSlot;
+    if (!scheduleGrid[e.day][slot]) {
+      scheduleGrid[e.day][slot] = e;
+    } else {
+      const existing = scheduleGrid[e.day][slot];
+      if (Array.isArray(existing)) existing.push(e);
+      else scheduleGrid[e.day][slot] = [existing, e];
+    }
+  }
+
+  const latestAY = tts[0]?.academicYear || entries[0]?.academicYear || '';
+
+  return res.json({
+    success: true,
+    data: {
+      teacher: {
+        id: String(teacher._id),
+        name: teacher.displayName,
+        department: teacher.department || '',
+        teacherId: teacher.teacherId || '',
+      },
+      meta: {
+        latestAcademicYear: latestAY,
+        classes: [...new Set(entries.map(e => `${e.year} ${e.branch} ${e.section} (${e.academicYear})`))],
+      },
+      grid: { days, timeSlots, schedule: scheduleGrid },
+      flat: entries,
+    }
+  });
+});
+
+
+
+
 
 /* ============================================================
    🟢 GET TIMETABLE BY CLASS (for Coordinators)
@@ -199,6 +350,10 @@ export const getTimetableByClass = asyncHandler(async (req, res, next) => {
    Access: Private (Coordinator)
 ============================================================ */
 export const createTimetable = asyncHandler(async (req, res, next) => {
+  // Normalize BEFORE validation
+  if (req.body.branch) req.body.branch = req.body.branch.toUpperCase().trim();
+  if (req.body.section) req.body.section = req.body.section.toUpperCase().trim();
+
   const errors = validationResult(req)
   if (!errors.isEmpty()) return next(new AppError(errors.array()[0].msg, 400))
 
@@ -226,11 +381,16 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
       code: slot.subject?.code || '',
       name: slot.subject?.name || slot.subject?.acronym || slot.subject || ''
     },
-    teacher: {
-      id: slot.teacher?.id || null,
-      name: typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.name || '',
-      username: slot.teacher?.username || ''
-    },
+    teacher: (() => {
+     // Normalize teacher formats (string / object / missing)
+      if (!slot.teacher) return { id: null, name: '', username: '' };
+      if (typeof slot.teacher === 'string') return { id: null, name: slot.teacher, username: '' };
+      return {
+        id: slot.teacher.id || null,
+        name: slot.teacher.name || '',
+        username: slot.teacher.username || ''
+      };
+    })(),
     type: slot.type || 'lecture',
     room: slot.room || ''
   }))
@@ -242,7 +402,7 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
     semester,
     academicYear,
     schedule: processedSchedule,
-    createdBy: req.user.id
+    createdBy: req.user?._id || null
   })
 
   await timetable.populate('createdBy', 'username firstName lastName')
@@ -255,74 +415,120 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
    Route: PUT /api/timetable/:id
    Access: Private (Coordinator)
 ============================================================ */
+/* ============================================================
+   🟢 UPDATE TIMETABLE
+   Route: PUT /api/timetable/:id
+   Access: Private (Coordinator)
+============================================================ */
 export const updateTimetable = asyncHandler(async (req, res, next) => {
-  // ✅ Fix: Normalize branch/section before validation or update
+  // ✅ Normalize branch/section before validation or update
   if (req.body.branch) req.body.branch = req.body.branch.toUpperCase().trim();
   if (req.body.section) req.body.section = req.body.section.toUpperCase().trim();
 
-  let timetable = await Timetable.findById(req.params.id)
-  if (!timetable) return next(new AppError('Timetable not found', 404))
+  let timetable = await Timetable.findById(req.params.id);
+  if (!timetable) return next(new AppError('Timetable not found', 404));
 
+  // ✅ SAFELY normalize schedule before saving (prevents crash)
+  if (req.body.schedule) {
+    req.body.schedule = req.body.schedule.map(slot => ({
+      day: slot.day,
+      timeSlot: slot.timeSlot,
+      subject: {
+        acronym: slot.subject?.acronym || slot.subject || '',
+        code: slot.subject?.code || '',
+        name: slot.subject?.name || slot.subject?.acronym || slot.subject || ''
+      },
+      teacher: (() => {
+        // Handle split-lab or missing teacher safely
+        if (!slot.teacher) return { id: null, name: '', username: '' };
+        if (typeof slot.teacher === 'string') return { id: null, name: slot.teacher, username: '' };
+        return {
+          id: slot.teacher.id || null,
+          name: slot.teacher.name || '',
+          username: slot.teacher.username || ''
+        };
+      })(),
+      type: slot.type || 'lecture',
+      room: slot.room || ''
+    }));
+  }
+
+  // ✅ Apply update after cleaning data
   timetable = await Timetable.findByIdAndUpdate(
     req.params.id,
-    { ...req.body, lastModifiedBy: req.user.id },
+    { ...req.body, lastModifiedBy: req.user?.id || null },
     { new: true, runValidators: true }
-  ).populate('createdBy lastModifiedBy', 'username firstName lastName')
+  ).populate('createdBy lastModifiedBy', 'username firstName lastName');
 
-  res.status(200).json({ success: true, data: timetable })
-})
+  res.status(200).json({ success: true, data: timetable });
+});
+
 
 /* ============================================================
    🟢 PUBLISH / UNPUBLISH TIMETABLE
    Route: PUT /api/timetable/:id/publish
    Access: Private (Coordinator)
 ============================================================ */
+/* ============================================================
+   🟢 PUBLISH / UNPUBLISH TIMETABLE
+   Route: PUT /api/timetable/:id/publish
+   Access: Private (Coordinator)
+============================================================ */
 export const publishTimetable = asyncHandler(async (req, res, next) => {
-  const { year, branch, section, semester, academicYear, schedule, isPublished } = req.body
+  const { year, branch, section, semester, academicYear, schedule, isPublished } = req.body;
   if (!year || !branch || !section || !semester || !academicYear)
-    return next(new AppError('Missing class identifiers', 400))
+    return next(new AppError('Missing class identifiers', 400));
 
-  const filter = { year, branch: branch.toUpperCase(), section: section.toUpperCase(), semester, academicYear }
-  const timetable = await Timetable.findOne(filter)
+  const filter = { 
+    year, 
+    branch: branch.toUpperCase(), 
+    section: section.toUpperCase(), 
+    semester, 
+    academicYear 
+  };
+
+  const timetable = await Timetable.findOne(filter);
+  const userId = req.user?._id || null; // ✅ Safe user ID (public actions ok)
 
   const baseSet = {
     schedule,
     isPublished: !!isPublished,
     publishedAt: isPublished ? new Date() : null,
-    lastModifiedBy: req.user._id,
-    createdBy: req.user._id,
+    lastModifiedBy: userId,
+    createdBy: userId,
     updatedAt: new Date()
-  }
+  };
 
-  const update = { $set: baseSet }
+  const update = { $set: baseSet };
 
   if (timetable) {
-    update.$set.publishedVersion = (timetable.publishedVersion || 1) + 1
+    update.$set.publishedVersion = (timetable.publishedVersion || 1) + 1;
     update.$push = {
       revisionHistory: {
         version: update.$set.publishedVersion,
         updatedAt: new Date(),
-        updatedBy: req.user._id
+        updatedBy: userId
       }
-    }
+    };
   }
 
   const updated = await Timetable.findOneAndUpdate(filter, update, {
     new: true,
     upsert: true,
     runValidators: true
-  }).populate('createdBy lastModifiedBy', 'username firstName lastName')
+  }).populate('createdBy lastModifiedBy', 'username firstName lastName');
 
-  if (isPublished) {
-    await createTimetableNotification(updated._id, 'timetable_published', req.user._id)
+  if (isPublished && userId) {
+    await createTimetableNotification(updated._id, 'timetable_published', userId);
   }
 
   res.status(200).json({
     success: true,
     message: `Timetable ${isPublished ? 'published' : 'unpublished'} successfully`,
     data: updated
-  })
-})
+  });
+});
+
 
 /* ============================================================
    🟢 DELETE TIMETABLE

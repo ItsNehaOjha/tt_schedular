@@ -72,7 +72,6 @@ const TeacherManagement = () => {
       setShowCreateForm(false)
       setFormData({
         username: '',
-        password: '',
         firstName: '',
         lastName: '',
         department: ''
