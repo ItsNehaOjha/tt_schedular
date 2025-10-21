@@ -11,41 +11,50 @@ const api = axios.create({
 // Ensure withCredentials is always true
 axios.defaults.withCredentials = true;
 
-// Request interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error.response?.status
-    const url = error.config?.url || ''
-    const path = window.location?.pathname || ''
-
-    const isCoordinatorRequest =
-      url.includes('/coordinator') ||
-      url.includes('/auth') ||
-      path.startsWith('/coordinator')
-
-    if (status === 401 && isCoordinatorRequest) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/coordinator/login'
-      return
+// Request interceptor - for setting headers, etc.
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    // For public pages, just surface the error without redirect
-    return Promise.reject(error)
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-)
+);
 
-
-// Response interceptor
+// Response interceptor - for handling auth redirects
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+    // Only handle auth redirects for actual responses (not network errors)
+    if (error.response) {
+      const status = error.response.status;
+      const url = error.config?.url || '';
+      const path = window.location?.pathname || '';
+      
+      const isCoordinatorRequest =
+        url.includes('/coordinator') ||
+        url.includes('/auth') ||
+        path.startsWith('/coordinator');
+      
+      // Only redirect for auth errors on protected routes
+      // Don't redirect for login/register attempts - let component handle those
+      if (status === 401 && isCoordinatorRequest && !url.includes('/login')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Use navigate instead of direct location change to prevent page reload
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/coordinator/login';
+          return Promise.reject(error);
+        }
+      }
     }
-    return Promise.reject(error)
+    
+    // For all other errors, just pass them through to be handled by components
+    return Promise.reject(error);
   }
 )
 

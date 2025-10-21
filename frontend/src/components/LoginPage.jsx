@@ -35,7 +35,9 @@ const LoginPage = ({ onLoginSuccess }) => {
                        data.data.user?.username || 
                        'User'
       
-      toast.success(`Welcome back, ${displayName}!`)
+      toast.success(`Welcome back, ${displayName}!`, {
+        duration: 3000
+      })
       
       // Redirect based on role
       if (data.data.user.role === 'coordinator') {
@@ -45,26 +47,37 @@ const LoginPage = ({ onLoginSuccess }) => {
       }
     },
     onError: (error) => {
-  console.error('Login error:', error)
+      console.error('Login error:', error)
 
-  const serverMsg = error?.response?.data?.message
-  const status = error?.response?.status
+      const serverMsg = error?.response?.data?.message
+      const status = error?.response?.status
 
-  if (error.code === 'ERR_NETWORK' && !error.response) {
-  toast.error('Cannot connect to backend (possible CORS issue or server offline).');
-  return;
-}
-
-  else if (status === 400 || status === 401) {
-    toast.error(serverMsg || 'Invalid username or password.')
-  } 
-  else if (status === 403) {
-    toast.error('Access denied. Unauthorized role or permissions.')
-  } 
-  else {
-    toast.error(serverMsg || error.message || 'Unexpected login error.')
-  }
-}
+      // Network error (server offline)
+      if (error.code === 'ERR_NETWORK' && !error.response) {
+        toast.error('Cannot connect to backend server. Please try again later.', {
+          duration: 5000 // Longer duration for network errors
+        });
+        return;
+      }
+      // Authentication errors
+      else if (status === 400 || status === 401) {
+        toast.error(serverMsg || 'Invalid username or password.', {
+          duration: 5000
+        });
+      } 
+      // Authorization errors
+      else if (status === 403) {
+        toast.error('Access denied. Unauthorized role or permissions.', {
+          duration: 5000
+        });
+      } 
+      // Other errors
+      else {
+        toast.error(serverMsg || error.message || 'Unexpected login error.', {
+          duration: 5000
+        });
+      }
+    }
 
   })
 
