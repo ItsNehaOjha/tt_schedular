@@ -14,7 +14,7 @@ const TeacherPage = () => {
   // Branch filter
   const [selectedBranch, setSelectedBranch] = useState('CSE')
   const [branchOptions] = useState([
-    { value: 'APPLIED', label: 'Applied Science' },
+    
     { value: 'CSE',     label: 'Computer Science & Engineering' },
     { value: 'CS',      label: 'Computer Science' },
     { value: 'CSD',     label: 'Computer Science & Design' },

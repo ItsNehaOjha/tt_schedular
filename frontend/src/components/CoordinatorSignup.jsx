@@ -52,13 +52,7 @@ const CoordinatorSignup = () => {
     e.preventDefault()
     
     if (formData.password !== formData.confirmPassword) {
-      signupMutation.setError({
-        response: {
-          data: {
-            message: 'Passwords do not match'
-          }
-        }
-      })
+       toast.error('Passwords do not match.');
       return
     }
 

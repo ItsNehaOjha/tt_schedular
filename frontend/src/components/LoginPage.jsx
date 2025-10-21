@@ -20,6 +20,7 @@ const LoginPage = ({ onLoginSuccess }) => {
 
   const loginMutation = useMutation({
     mutationFn: authAPI.login,
+    retry: false,
     onSuccess: (data) => {
       // Save token and user data to localStorage
       if (data.data.token) {
@@ -44,17 +45,27 @@ const LoginPage = ({ onLoginSuccess }) => {
       }
     },
     onError: (error) => {
-      console.error('Login error:', error)
-      
-      // Handle different types of errors
-      if (error.code === 'ERR_NETWORK') {
-        toast.error('Unable to connect to server. Please check if the backend is running.')
-      } else if (error.response?.status === 401) {
-        toast.error('Invalid username or password')
-      } else {
-        toast.error(error.response?.data?.message || 'Login failed')
-      }
-    }
+  console.error('Login error:', error)
+
+  const serverMsg = error?.response?.data?.message
+  const status = error?.response?.status
+
+  if (error.code === 'ERR_NETWORK' && !error.response) {
+  toast.error('Cannot connect to backend (possible CORS issue or server offline).');
+  return;
+}
+
+  else if (status === 400 || status === 401) {
+    toast.error(serverMsg || 'Invalid username or password.')
+  } 
+  else if (status === 403) {
+    toast.error('Access denied. Unauthorized role or permissions.')
+  } 
+  else {
+    toast.error(serverMsg || error.message || 'Unexpected login error.')
+  }
+}
+
   })
 
   const handleChange = (e) => {
