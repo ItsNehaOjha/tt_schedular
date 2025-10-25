@@ -32,15 +32,20 @@ export const prepareTimetableForPDF = (timetable) => {
   timetable.schedule.forEach(slot => {
     if (!slot.day || !slot.timeSlot) return;
     schedule[slot.day][slot.timeSlot] = {
-      subject: slot.subject?.acronym || slot.subject?.name || '',
-      code: slot.subject?.code || '',
-      teacher:
-        typeof slot.teacher === 'object'
-          ? slot.teacher.name || slot.teacher.username || ''
-          : slot.teacher || '',
-      type: slot.type || 'lecture',
-      room: slot.room || ''
-    };
+  subject: {
+    name: slot.subject?.name || slot.subject || '',
+    acronym: slot.subject?.acronym || '',
+    code: slot.subject?.code || '',
+  },
+  teacher:
+    typeof slot.teacher === 'object'
+      ? slot.teacher.name || slot.teacher.username || ''
+      : slot.teacher || '',
+  type: slot.type || 'lecture',
+  room: slot.room || ''
+};
+
+
   });
 
   return { schedule, days, timeSlots };

@@ -1,251 +1,253 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import toast from 'react-hot-toast';
+// frontend/src/utils/pdfExport.js
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import logo from "../asset/ims-logo.png"; // <-- Place your logo inside /src/assets
 
 export const exportToPDF = (timetableData) => {
   try {
-    console.log('PDF Export - Full timetable data:', timetableData);
-    
-    const doc = new jsPDF();
-    
-    // Set title
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Timetable', 105, 20, { align: 'center' });
-    
-    // Add timetable info
+    const doc = new jsPDF("landscape", "pt", "a4");
+
+    // ---------- Header Section ----------
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+
+    // College Logo
+    doc.addImage(logo, "PNG", 40, 25, 60, 60);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("IMS ENGINEERING COLLEGE, GHAZIABAD", centerX, 45, { align: "center" });
+
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const info = `${timetableData.year || 'N/A'} - ${timetableData.branch || 'N/A'} - Section ${timetableData.section || 'N/A'}`;
-    doc.text(info, 105, 30, { align: 'center' });
-    
-    // Add academic year and semester if available
-    if (timetableData.academicYear || timetableData.semester) {
-      const academicInfo = `Academic Year: ${timetableData.academicYear || 'N/A'} | Semester: ${timetableData.semester || 'N/A'}`;
-      doc.text(academicInfo, 105, 40, { align: 'center' });
-    }
-    
-    // Prepare table data
+    doc.setFont("helvetica", "bold");
+    doc.text("Department of Computer Science & Engineering", centerX, 65, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`TIME TABLE (w.e.f. ${new Date().toLocaleDateString("en-GB")})`, centerX, 80, { align: "center" });
+
+    doc.text(
+      `${timetableData.year || "B.Tech"} | Semester: ${timetableData.semester || "N/A"} | Academic Year: ${timetableData.academicYear || "N/A"}`,
+      centerX,
+      95,
+      { align: "center" }
+    );
+
+    // ---------- Prepare Data ----------
     const schedule = timetableData.schedule || {};
     const timeSlots = timetableData.timeSlots || [];
     const days = timetableData.days || [];
-    
-    console.log('PDF Export - Schedule data:', schedule);
-    console.log('PDF Export - Time slots:', timeSlots);
-    console.log('PDF Export - Days:', days);
-    
-    if (timeSlots.length === 0 || days.length === 0) {
-      doc.text('No timetable data available', 105, 60, { align: 'center' });
-      doc.save(`timetable-${timetableData.year || 'unknown'}-${timetableData.branch || 'unknown'}-${timetableData.section || 'unknown'}.pdf`);
+
+   const getCompactSubjectName = (subjectName = "") => {
+  if (!subjectName) return "";
+
+  const cleanName = subjectName.replace(/\(.*continued.*\)/i, "").trim();
+
+  // 🧩 Direct special mappings (priority)
+  const special = {
+    "Web Technology": "WT",
+    "Database Management System": "DBMS",
+    "Operating System": "OS",
+    "Machine Learning": "ML",
+    "Data Analysis": "DA",
+    Anudip: "Anudip",
+    Library: "Library",
+    Break: "Break",
+    Lunch: "Lunch",
+    "Mini Project": "Mini Project",
+    Mentor: "Mentor",
+  };
+
+  for (const key in special) {
+    if (cleanName.toLowerCase().includes(key.toLowerCase())) return special[key];
+  }
+
+  const words = cleanName.split(/\s+/).filter((w) => w.length > 2);
+
+  // 🧠 Case 1: Single short word (<= 8 chars) → show full word
+  if (words.length === 1 && cleanName.length <= 8) {
+    return cleanName;
+  }
+
+  // 🧠 Case 2: Single long word (> 8 chars) → shorten smartly
+  if (words.length === 1 && cleanName.length > 8) {
+    return cleanName.substring(0, 5).toUpperCase(); // e.g., "Programming" → "PROGR"
+  }
+
+  // 🧩 Case 3: Multi-word → use acronym (up to 3 chars)
+  const acronym = words.map((w) => w[0].toUpperCase()).slice(0, 3).join("");
+
+  // 🧩 Fallback: use first 3 letters
+  return acronym || cleanName.substring(0, 3).toUpperCase();
+};
+
+
+  const formatTeacherName = (fullName = "") => {
+  if (!fullName) return "";
+  const clean = fullName.trim().replace(/\s{2,}/g, " ");
+  const parts = clean.split(" ");
+
+  // Keep only the first name (ignore last name)
+  const firstName = parts.length > 1 ? parts[1] : parts[0];
+
+  // Detect prefixes properly
+  if (/^(Mr|Ms|Mrs|Dr|Prof)\.?$/i.test(parts[0])) {
+    return `${parts[0].replace(".", "")}. ${firstName}`;
+  }
+
+  return `Mr. ${parts[0]}`; // Default fallback
+};
+
+
+
+   const rows = timeSlots.map((slot) => {
+  const row = [slot];
+  days.forEach((day) => {
+    const cell = schedule[day]?.[slot];
+    if (!cell || (!cell.subject && !cell.teacher)) {
+      row.push("");
       return;
     }
-    
-    // Create table headers
-    const headers = ['Time', ...days];
-    
-    // Helper function to generate acronym from subject name
-    const generateAcronym = (subjectName) => {
-      if (!subjectName || typeof subjectName !== 'string') return '';
-      
-      // Remove common words and prepositions
-      const wordsToIgnore = ['and', 'of', 'the', 'in', 'to', 'for', 'with', 'on', 'at', 'by', 'from'];
-      
-      const words = subjectName
-        .trim()
-        .split(/\s+/)
-        .filter(word => word.length > 0 && !wordsToIgnore.includes(word.toLowerCase()));
-      
-      if (words.length === 0) return subjectName.substring(0, 3).toUpperCase();
-      
-      // Take first letter of each significant word
-      let acronym = words.map(word => word.charAt(0).toUpperCase()).join('');
-      
-      // If acronym is too long (more than 6 characters), take only first 6
-      if (acronym.length > 6) {
-        acronym = acronym.substring(0, 6);
-      }
-      
-      // If acronym is too short (less than 2 characters), add more letters
-      if (acronym.length < 2 && words.length > 0) {
-        acronym = words[0].substring(0, Math.min(4, words[0].length)).toUpperCase();
-      }
-      
-      return acronym;
-    };
-    
-    // Helper function to get subject display name (full name or acronym, not code)
-    const getSubjectDisplayName = (cellData) => {
-      // If subject name is short (≤ 8 characters), use it as is
-      if (cellData.subject && cellData.subject.length <= 8) {
-        return cellData.subject;
-      }
-      
-      // Generate acronym for longer subject names
-      return generateAcronym(cellData.subject);
+
+    // 🧩 Unified subject/code extraction (handles both nested + flat formats)
+const subj =
+  typeof cell.subject === "object"
+    ? cell.subject
+    : { name: cell.subject || "", code: cell.code || "" };
+
+const subjectAcronym = getCompactSubjectName(subj.name || "");
+const subjectCode = subj.code?.trim() || cell.code?.trim() || "";
+
+    const teacherName = formatTeacherName(
+      typeof cell.teacher === "string" ? cell.teacher : cell.teacher?.name
+    );
+
+    // ✅ Final structured layout: Acronym → Code → Teacher
+    let text = "";
+    if (subjectAcronym) text += `${subjectAcronym}`;
+    if (subjectCode) text += `\n(${subjectCode})`;
+    if (teacherName) text += `\n${teacherName}`;
+
+    row.push(text.trim());
+  });
+  return row;
+});
+
+
+    // ---------- Colors ----------
+    const typeColors = {
+      lecture: [225, 255, 225],
+      lab: [210, 230, 255],
+      "split-lab": [240, 220, 255],
+      lunch: [255, 245, 210],
+      break: [255, 245, 210],
+      library: [255, 255, 240],
+      default: [255, 255, 255],
     };
 
-    // Helper function to format subject with code
-    const formatSubjectWithCode = (cellData) => {
-      let subjectText = '';
-      
-      // First line: Subject name or acronym
-      if (cellData.subject) {
-        subjectText = getSubjectDisplayName(cellData);
-      }
-      
-      // Second line: Subject code (if different from subject name)
-      if (cellData.code && cellData.code !== cellData.subject && cellData.code.trim() !== '') {
-        subjectText += `\n${cellData.code}`;
-      }
-      
-      return subjectText;
-    };
-
-    // Helper function to format teacher name for PDF
-    const formatTeacherName = (fullName) => {
-      if (!fullName || typeof fullName !== 'string') return '';
-      
-      // If the name starts with title (Mr., Dr., Prof., etc.), keep the title + first name
-      const nameParts = fullName.trim().split(' ');
-      if (nameParts.length >= 2) {
-        const firstPart = nameParts[0];
-        // Check if first part is a title
-        if (firstPart.match(/^(Mr|Dr|Prof|Ms|Mrs)\.?$/i)) {
-          // Return title + first name (e.g., "Mr. Piyush" from "Mr. Piyush Kumar")
-          return `${firstPart}${firstPart.endsWith('.') ? '' : '.'} ${nameParts[1]}`;
-        } else {
-          // If no title, just return first name
-          return nameParts[0];
-        }
-      }
-      return fullName;
-    };
-
-    // Create table rows
-    const rows = timeSlots.map(timeSlot => {
-      const row = [timeSlot];
-      days.forEach(day => {
-        const cellData = schedule[day]?.[timeSlot];
-        
-        console.log(`PDF Export - Cell data for ${day} ${timeSlot}:`, cellData);
-        
-        // Handle split-lab with parallel sessions
-        if (cellData && cellData.type === 'split-lab' && cellData.parallelSessions) {
-          let cellText = '';
-          cellData.parallelSessions.forEach((session, index) => {
-            if (index > 0) cellText += '\n---\n'; // Separator between sessions
-            
-            // Use subject name/acronym for parallel sessions
-            const subjectDisplay = session.subject && session.subject.length <= 8 
-              ? session.subject 
-              : generateAcronym(session.subject);
-            cellText += `${subjectDisplay} LAB (${session.batch})`;
-            
-            // Add subject code if available and different
-            if (session.code && session.code !== session.subject && session.code.trim() !== '') {
-              cellText += `\n${session.code}`;
-            }
-            
-            // Add teacher name
-            if (session.teacher) {
-              const formattedTeacherName = formatTeacherName(session.teacher);
-              cellText += `\n${formattedTeacherName}`;
-            }
-            
-            // Add room information
-            if (session.room) {
-              cellText += `\n${session.room}`;
-            }
-          });
-          
-          row.push(cellText || 'N/A');
-        } else if (cellData && (cellData.subject || cellData.teacher)) {
-          let cellText = '';
-          
-          // Format subject with code
-          if (cellData.subject) {
-            cellText = formatSubjectWithCode(cellData);
-          }
-          
-          // Add teacher name - handle both string and object formats
-          let teacherName = '';
-          if (typeof cellData.teacher === 'string') {
-            teacherName = cellData.teacher;
-          } else if (cellData.teacher && typeof cellData.teacher === 'object') {
-            teacherName = cellData.teacher.name || '';
-          }
-          
-          console.log(`PDF Export - Teacher name extracted: "${teacherName}"`);
-          
-          if (teacherName && teacherName.trim() !== '') {
-            const formattedTeacherName = formatTeacherName(teacherName);
-            console.log(`PDF Export - Formatted teacher name: "${formattedTeacherName}"`);
-            cellText += cellText ? `\n${formattedTeacherName}` : formattedTeacherName;
-          }
-          
-          // Add room information
-          if (cellData.room) {
-            cellText += cellText ? `\n${cellData.room}` : cellData.room;
-          }
-          
-          row.push(cellText || 'N/A');
-        } else if (cellData && (cellData.type === 'lunch' || cellData.type === 'break' || 
-                   (typeof cellData === 'string' && cellData.toLowerCase().includes('lunch')))) {
-          row.push('LUNCH');
-        } else {
-          row.push('');
-        }
-      });
-      return row;
-    });
-    
-    console.log('PDF Export - Final rows data:', rows);
-    
-    // Add table to PDF using autoTable function with optimized settings for A4 fit
+    // ---------- Main Table ----------
     autoTable(doc, {
-      head: [headers],
+      startY: 110,
+      head: [["Time", ...days]],
       body: rows,
-      startY: 50,
+      theme: "grid",
       styles: {
-        fontSize: 7, // Reduced font size for better fit
-        cellPadding: 2, // Reduced padding
-        overflow: 'linebreak',
-        halign: 'center',
-        valign: 'middle',
-        lineColor: [0, 0, 0],
-        lineWidth: 0.1
+        fontSize: 8,
+        halign: "center",
+        valign: "middle",
+        cellPadding: 2,
       },
       headStyles: {
-        fillColor: [66, 139, 202],
+        fillColor: [41, 128, 185],
         textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 8 // Slightly larger for headers
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
+        fontStyle: "bold",
       },
       columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [230, 230, 230], fontSize: 7, minCellWidth: 25 }
+        0: { fillColor: [230, 230, 230], fontStyle: "bold", cellWidth: 85 },
       },
-      margin: { top: 50, left: 8, right: 8 }, // Reduced margins for more space
-      tableWidth: 'auto', // Let table adjust width automatically
-      didDrawPage: function (data) {
-        // Add footer
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated on ${new Date().toLocaleDateString()}`, 105, doc.internal.pageSize.height - 10, { align: 'center' });
-      }
+      didParseCell: function (data) {
+        if (data.section === "body" && data.column.index > 0) {
+          const day = days[data.column.index - 1];
+          const time = timeSlots[data.row.index];
+          const cell = schedule?.[day]?.[time];
+          if (cell) data.cell.styles.fillColor = typeColors[cell.type] || typeColors.default;
+        }
+      },
     });
-    
-    // Save the PDF
-    const fileName = `timetable-${timetableData.year || 'unknown'}-${timetableData.branch || 'unknown'}-${timetableData.section || 'unknown'}.pdf`;
+
+    // ---------- Legend ----------
+    const legendY = doc.lastAutoTable.finalY + 20;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Legend:", 40, legendY);
+
+    const legendItems = [
+      { color: typeColors.lecture, label: "Lecture" },
+      { color: typeColors.lab, label: "Lab" },
+      { color: typeColors["split-lab"], label: "Split Lab" },
+      { color: typeColors.lunch, label: "Lunch / Break" },
+    ];
+
+    let x = 100;
+    legendItems.forEach((item) => {
+      doc.setFillColor(...item.color);
+      doc.rect(x, legendY - 8, 12, 12, "F");
+      doc.text(item.label, x + 18, legendY + 2);
+      x += 100;
+    });
+
+    // ---------- Bottom Subject Table ----------
+    const subjTable = (timetableData.subjectList || []).map((s) => [
+      s.shortName,
+      s.code,
+      s.name,
+      s.teacher,
+    ]);
+
+    if (subjTable.length > 0) {
+      autoTable(doc, {
+        startY: legendY + 25,
+        head: [["Short Name", "Sub. Code", "Subject Name", "Subject Teacher"]],
+        body: subjTable,
+       styles: {
+  fontSize: 9,
+  halign: "center",
+  valign: "middle",
+  cellPadding: { top: 10, right: 6, bottom: 10, left: 6 },  // ✅ more breathing space
+  lineWidth: 0.2,
+  lineHeight: 1.2,
+  lineColor: [180, 180, 180],
+  overflow: "linebreak",
+  minCellHeight: 28, // ✅ uniform height
+},
+       headStyles: {
+  fillColor: [30, 70, 140],
+  textColor: 255,
+  fontStyle: "bold",
+  halign: "center",
+  valign: "middle",
+  cellPadding: { top: 10, bottom: 10 },
+},
+alternateRowStyles: { fillColor: [250, 250, 250] },
+      });
+    }
+
+    // ---------- Footer ----------
+    const footerY = doc.internal.pageSize.getHeight() - 40;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+  `Name of Time-Table Incharge:  ${timetableData.coordinatorName || "Coordinator"}`,
+  centerX,
+  footerY,
+  { align: "center" }
+);
+
+    doc.text("Signature: HOD", pageWidth - 100, footerY);
+
+    // ---------- Save ----------
+    const fileName = `timetable-${timetableData.year}-${timetableData.branch}-Section-${timetableData.section}.pdf`;
     doc.save(fileName);
-    
-    toast.success('PDF downloaded successfully!');
-    
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    toast.error('Failed to generate PDF. Please check your timetable data and try again.');
-    throw error;
+  } catch (err) {
+    console.error("PDF generation failed:", err);
   }
 };

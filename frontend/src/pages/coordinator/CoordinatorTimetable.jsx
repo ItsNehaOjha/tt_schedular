@@ -214,48 +214,63 @@ const fetchExistingTimetable = async (classData) => {
 
   // === Publish Timetable ===
   const handlePublishTimetable = async (data) => {
-    try {
-      const toastId = toast.loading('Publishing timetable...')
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      const coordinatorId = user.id || user._id
-      if (!coordinatorId) {
-        toast.dismiss(toastId)
-        return toast.error('Login required.')
-      }
+  try {
+    const toastId = toast.loading('Publishing timetable...')
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const coordinatorId = user.id || user._id
 
-      const sanitized = sanitizeSchedule(data.schedule)
-      const fullPayload = {
-        year: data.year || selectedClass?.year,
-        branch: (data.branch || selectedClass?.branch || '').toLowerCase(),
-        section: data.section || selectedClass?.section,
-        semester: data.semester || selectedClass?.semester,
-        academicYear: data.academicYear || selectedClass?.academicYear,
-        schedule: sanitized,
-        isPublished: true
-      }
-
-      const id = timetableData?._id || timetableData?.id
-      const response = await timetableAPI.publishTimetable(id, fullPayload)
-
-      const published = unwrapResponse(response)
-      if (!published) throw new Error('Invalid publish response')
-
-      setTimetableData(published)
-      setSavedTimetableId(published._id || published.id)
-      setIsPublished(true)
-
+    if (!coordinatorId) {
       toast.dismiss(toastId)
-      toast.success('Timetable published successfully!')
-      setCurrentStep('grid')
-      return published
-    } catch (err) {
-      console.error('Publish error:', err)
-      toast.error(
-        'Failed to publish timetable: ' + (err.response?.data?.message || err.message)
-      )
-      throw err
+      return toast.error('Login required.')
     }
+
+    // ✅ Construct full name safely
+    const coordinatorName = (() => {
+      const salutation = user.salutation ? `${user.salutation}.` : "Mr."
+      const first = user.firstName?.trim() || ""
+      const last = user.lastName?.trim() || ""
+      const username = user.username || ""
+      const combined = [salutation, first, last].filter(Boolean).join(" ").trim()
+      return combined || `Mr. ${username}`
+    })()
+
+    // ✅ Clean schedule before sending
+    const sanitized = sanitizeSchedule(data.schedule)
+
+    // ✅ Final payload to send to backend
+    const fullPayload = {
+      year: data.year || selectedClass?.year,
+      branch: (data.branch || selectedClass?.branch || '').toLowerCase(),
+      section: data.section || selectedClass?.section,
+      semester: data.semester || selectedClass?.semester,
+      academicYear: data.academicYear || selectedClass?.academicYear,
+      schedule: sanitized,
+      isPublished: true,
+      coordinatorName // ✅ Send full name here
+    }
+
+    const id = timetableData?._id || timetableData?.id
+    const response = await timetableAPI.publishTimetable(id, fullPayload)
+
+    const published = unwrapResponse(response)
+    if (!published) throw new Error('Invalid publish response')
+
+    setTimetableData(published)
+    setSavedTimetableId(published._id || published.id)
+    setIsPublished(true)
+
+    toast.dismiss(toastId)
+    toast.success('Timetable published successfully!')
+    setCurrentStep('grid')
+
+    return published
+  } catch (err) {
+    console.error('Publish error:', err)
+    toast.error('Failed to publish timetable: ' + (err.response?.data?.message || err.message))
+    throw err
   }
+}
+
 
   // === Render Views ===
   if (currentStep === 'selector')

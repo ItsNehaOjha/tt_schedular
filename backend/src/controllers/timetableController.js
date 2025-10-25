@@ -569,6 +569,7 @@ export const updateTimetable = asyncHandler(async (req, res, next) => {
 ============================================================ */
 export const publishTimetable = asyncHandler(async (req, res, next) => {
   const { year, branch, section, semester, academicYear, schedule, isPublished } = req.body;
+  
   if (!year || !branch || !section || !semester || !academicYear)
     return next(new AppError('Missing class identifiers', 400));
 
@@ -580,20 +581,37 @@ export const publishTimetable = asyncHandler(async (req, res, next) => {
     academicYear 
   };
 
-  const timetable = await Timetable.findOne(filter);
-  const userId = req.user?._id || null; // ✅ Safe user ID (public actions ok)
+  const userId = req.user?._id || null;
 
+  // ✅ Build full coordinator name (safe and formatted)
+  // ✅ Prefer name sent from frontend, else fallback to logged-in user info
+const coordinatorName = req.body.coordinatorName?.trim() || (() => {
+  const salutation = req.user?.salutation ? `${req.user.salutation}.` : "Mr.";
+  const first = req.user?.firstName?.trim() || "";
+  const last = req.user?.lastName?.trim() || "";
+  return [salutation, first, last].filter(Boolean).join(" ").trim();
+})();
+
+  const timetable = await Timetable.findOne(filter);
+
+  // ✅ Base fields to set (publish metadata + last modified info)
   const baseSet = {
     schedule,
     isPublished: !!isPublished,
     publishedAt: isPublished ? new Date() : null,
     lastModifiedBy: userId,
     createdBy: userId,
-    updatedAt: new Date()
+    updatedAt: new Date(),
   };
+
+  // ✅ Store coordinator name only when publishing (once per publish)
+  if (isPublished) {
+    baseSet.coordinatorName = coordinatorName;
+  }
 
   const update = { $set: baseSet };
 
+  // ✅ Version tracking (only if timetable already exists)
   if (timetable) {
     update.$set.publishedVersion = (timetable.publishedVersion || 1) + 1;
     update.$push = {
@@ -605,12 +623,14 @@ export const publishTimetable = asyncHandler(async (req, res, next) => {
     };
   }
 
+  // ✅ Update or create timetable
   const updated = await Timetable.findOneAndUpdate(filter, update, {
     new: true,
     upsert: true,
     runValidators: true
   }).populate('createdBy lastModifiedBy', 'username firstName lastName');
 
+  // ✅ Notify subscribers (optional)
   if (isPublished && userId) {
     await createTimetableNotification(updated._id, 'timetable_published', userId);
   }
@@ -621,6 +641,7 @@ export const publishTimetable = asyncHandler(async (req, res, next) => {
     data: updated
   });
 });
+
 
 
 /* ============================================================

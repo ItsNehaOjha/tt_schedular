@@ -83,15 +83,17 @@ const StudentDashboard = () => {
       const { schedule, days, timeSlots } = prepareTimetableForPDF(timetable)
 
       const timetableData = {
-        year: timetable.year || year,
-        branch: timetable.branch || branch,
-        section: timetable.section || section,
-        semester: timetable.semester || '',
-        academicYear: timetable.academicYear || new Date().getFullYear(),
-        schedule,
-        timeSlots,
-        days
-      }
+      year: timetable.year || year,
+      branch: timetable.branch || branch,
+      section: timetable.section || section,
+      semester: timetable.semester || '',
+      academicYear: timetable.academicYear || new Date().getFullYear(),
+      schedule,
+      timeSlots,
+      days,
+      coordinatorName: timetable.coordinatorName || 'Coordinator'
+    }
+
 
       console.log('✅ Final processed timetable for PDF:', timetableData)
       exportToPDF(timetableData)
@@ -141,6 +143,12 @@ const StudentDashboard = () => {
               <p className="text-gray-600">
                 {timetable ? `Academic Year ${timetable.academicYear}` : 'Academic Year 2024-25'}
               </p>
+              {timetable?.coordinatorName && (
+  <p className="text-sm text-gray-700 mt-1">
+    <strong>Published by:</strong> {timetable.coordinatorName}
+  </p>
+)}
+
             </div>
           </div>
 

@@ -63,6 +63,8 @@ const timetableSchema = new mongoose.Schema({
     required: [true, 'Year is required'],
     enum: ['1st Year', '2nd Year', '3rd Year', '4th Year']
   },
+  coordinatorName: { type: String, required: true },
+
   branch: {
     type: String,
     required: [true, 'Branch is required'],
