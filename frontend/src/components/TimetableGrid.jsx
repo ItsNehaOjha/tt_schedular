@@ -320,42 +320,49 @@ const handleClearCell = (day, timeSlot) => {
       }
 
       // split-lab logic - fixed to occupy exactly 2 consecutive slots
-      if (cellData.type === 'split-lab' && cellData.parallelSessions) {
-        const currentSlotIndex = timeSlots.indexOf(editingCell.timeSlot)
-        const nextSlotIndex = currentSlotIndex + 1
-        if (nextSlotIndex < timeSlots.length) {
-          const nextSlot = timeSlots[nextSlotIndex]
-          const nextSlotData = newSchedule[editingCell.day][nextSlot]
-          const isNextSlotEmpty = !nextSlotData || (!nextSlotData.subject && !nextSlotData.teacher)
-          if (isNextSlotEmpty) {
-            // Set the current slot with split-lab data
-            newSchedule[editingCell.day][editingCell.timeSlot] = {
-              type: 'split-lab',
-              parallelSessions: cellData.parallelSessions,
-              isMerged: true,
-              mergeRows: 2, // Exactly 2 rows
-              isLabSession: true,
-              // Mark as first slot for styling
-            }
-            // Mark the next slot as hidden (part of the split-lab)
-            newSchedule[editingCell.day][nextSlot] = {
-              type: 'split-lab-hidden',
-              
-              isHidden: true,
-              isContinuation: true
-            }
-            setScheduleData(newSchedule)
-            setEditingCell(null)
-            return
-          } else {
-            toast.error('Next time slot is not available for split lab session')
-            return
-          }
-        } else {
-          toast.error('Cannot schedule split lab session - no next time slot available')
-          return
-        }
-      }
+      // 🧩 Split-lab logic – display both B1 & B2 visibly, no hidden rows
+if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
+  const currentSlotIndex = timeSlots.indexOf(editingCell.timeSlot)
+  const nextSlotIndex = currentSlotIndex + 1
+  if (nextSlotIndex >= timeSlots.length) {
+    toast.error("No next slot available for split lab")
+    return
+  }
+
+  const nextSlot = timeSlots[nextSlotIndex]
+  const nextSlotData = newSchedule[editingCell.day][nextSlot]
+  const isNextSlotEmpty = !nextSlotData || (!nextSlotData.subject && !nextSlotData.teacher)
+
+  if (!isNextSlotEmpty) {
+    toast.error("Next slot is not empty — cannot place split lab here")
+    return
+  }
+
+  const [batch1, batch2] = cellData.parallelSessions
+
+  // ✅ First batch (B1)
+  newSchedule[editingCell.day][editingCell.timeSlot] = {
+    ...batch1,
+    type: "split-lab",
+    batch: batch1.batch || "B1",
+    color: "#ede9fe", // violet tint
+    sameGroup: true
+  }
+
+  // ✅ Second batch (B2)
+  newSchedule[editingCell.day][nextSlot] = {
+    ...batch2,
+    type: "split-lab",
+    batch: batch2.batch || "B2",
+    color: "#ede9fe",
+    sameGroup: true
+  }
+
+  setScheduleData(newSchedule)
+  setEditingCell(null)
+  return
+}
+
 
       // multi-slot lab (2-hour) - fixed to occupy exactly 2 consecutive slots
       if (cellData.isLabSession && cellData.requiresMultipleSlots && cellData.type !== 'split-lab') {
@@ -776,15 +783,19 @@ const handleClearCell = (day, timeSlot) => {
       if (!cellData || (!cellData.subject && !cellData.teacher && !cellData.parallelSessions)) return { isEmpty: true }
       
       // Handle split-lab cells
-      if (cellData.type === 'split-lab' && cellData.parallelSessions) {
-        return { 
-          isEmpty: false, 
-          type: 'split-lab', 
-          parallelSessions: cellData.parallelSessions, 
-          isMerged: true, 
-          mergeRows: 2 
-        }
-      }
+      if (cellData.type === 'split-lab') {
+  return {
+    isEmpty: false,
+    type: 'split-lab',
+    subject: cellData.subject || '',
+    teacher: cellData.teacher || '',
+    code: cellData.code || '',
+    room: cellData.room || '',
+    batch: cellData.batch || '',
+    sameGroup: true
+  }
+}
+
       
       // Handle regular lab cells with mergeRows
       if (cellData.type === 'lab' && cellData.isMerged) {
@@ -826,6 +837,8 @@ const handleClearCell = (day, timeSlot) => {
       if (typeLower === 'library' || subjectLower.includes('library')) return { bgColor: 'bg-green-50 border-green-200 text-green-800' }
       if (typeLower === 'mini project' || subjectLower.includes('mini project')) return { bgColor: 'bg-purple-50 border-purple-200 text-purple-800' }
       if (typeLower === 'mentor' || subjectLower.includes('mentor')) return { bgColor: 'bg-yellow-50 border-yellow-200 text-yellow-800' }
+      if (typeLower === 'split-lab' || subjectLower.includes('split-lab')) return { bgColor: 'bg-violet-50 border-violet-200 text-violet-800' }
+
       return { bgColor: 'bg-white border-gray-200 text-gray-800' }
     }
 
@@ -1127,18 +1140,22 @@ const handleClearCell = (day, timeSlot) => {
       <span className="font-bold text-gray-800">
         {cellContent.subject || cellContent.type.toUpperCase()}
       </span>
-    ) : cellContent.type === 'split-lab' && cellContent.parallelSessions ? (
-      <div className="flex flex-col text-sm p-2 space-y-2">
-        {cellContent.parallelSessions.map((session, idx) => (
-          <div key={idx} className="py-1 border-b border-violet-200 last:border-b-0">
-            <div className="font-semibold text-violet-700">{session.subject} LAB ({session.batch})</div>
-            <div className="text-xs text-gray-600">{session.code} - {session.teacher}</div>
-          </div>
-        ))}
-        <div className="text-xs mt-1 text-gray-500 italic">
-          Room: {cellContent.parallelSessions.map(s => s.room).filter(Boolean).join(' & ') || 'TBD'}
-        </div>
-      </div>
+   ) : cellContent.type === 'split-lab' ? (
+  <div className="p-2 h-full flex flex-col justify-center items-center text-center space-y-1">
+    <div className="font-semibold text-violet-800">
+      {cellContent.batch ? `${cellContent.batch}: ${cellContent.subject}` : cellContent.subject}
+    </div>
+    {cellContent.code && (
+      <div className="text-xs text-gray-500">{cellContent.code}</div>
+    )}
+    {cellContent.teacher && (
+      <div className="text-xs text-gray-600">{cellContent.teacher}</div>
+    )}
+    {cellContent.room && (
+      <div className="text-xs text-gray-500">📍 {cellContent.room}</div>
+    )}
+  </div>
+
     ) : (
       <>
         <div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>
@@ -1237,22 +1254,22 @@ const handleClearCell = (day, timeSlot) => {
       <span className="font-bold text-center text-gray-800">
         {cellContent.subject || cellContent.type.toUpperCase()}
       </span>
-    ) : cellContent.type === 'split-lab' && cellContent.parallelSessions ? (
-      <div className="flex flex-col text-sm p-2 space-y-2">
-        {cellContent.parallelSessions.map((session, idx) => (
-          <div key={idx} className="py-1 border-b border-violet-200 last:border-b-0">
-            <div className="font-semibold text-violet-700">
-              {session.subject} LAB ({session.batch})
-            </div>
-            <div className="text-xs text-gray-600">
-              {session.code} - {session.teacher}
-            </div>
-          </div>
-        ))}
-        <div className="text-xs mt-1 text-gray-500 italic">
-          Room: {cellContent.parallelSessions.map(s => s.room).filter(Boolean).join(' & ') || 'TBD'}
-        </div>
-      </div>
+    ) : cellContent.type === 'split-lab' ? (
+  <div className="p-2 h-full flex flex-col justify-center items-center text-center space-y-1">
+    <div className="font-semibold text-violet-800">
+      {cellContent.batch ? `${cellContent.batch}: ${cellContent.subject}` : cellContent.subject}
+    </div>
+    {cellContent.code && (
+      <div className="text-xs text-gray-500">{cellContent.code}</div>
+    )}
+    {cellContent.teacher && (
+      <div className="text-xs text-gray-600">{cellContent.teacher}</div>
+    )}
+    {cellContent.room && (
+      <div className="text-xs text-gray-500">📍 {cellContent.room}</div>
+    )}
+  </div>
+
     ) : (
       <>
         <div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>

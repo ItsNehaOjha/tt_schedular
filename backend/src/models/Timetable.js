@@ -48,7 +48,7 @@ slotKey: {
   },
   type: {
     type: String,
-    enum: ['lecture', 'lab', 'lunch', 'free', 'break', 'library', 'mini project', 'mentor'],
+    enum: ['lecture', 'lab','split-lab', 'lunch', 'free', 'break', 'library', 'mini project', 'mentor'],
     default: 'lecture'
   },
   room: {
