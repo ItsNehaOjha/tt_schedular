@@ -131,58 +131,151 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
    Route: GET /api/timetable/teacher/:id
    Access: Public or Protected
 ============================================================ */
+
 export const getBusyTeachersForSlot = async (req, res) => {
   try {
-    const { day, slotKey, timeSlot, branch, year, section } = req.query
+    const { day, slotKey, timeSlot, branch, year, section } = req.query;
     if (!day || (!slotKey && !timeSlot)) {
-      return res.status(400).json({ success: false, message: 'day and slotKey|timeSlot required' })
+      return res.status(400).json({ success: false, message: 'day and slotKey|timeSlot required' });
     }
-    const slot = slotKey || timeSlot
+    const slot = slotKey || timeSlot;
 
-    const match = { 'schedule.day': day, 'schedule.timeSlot': slot }
-    if (branch) match.branch = branch
-    if (year) match.year = year
-    if (section) match.section = section
+    const match = { 'schedule.day': day, 'schedule.timeSlot': slot };
+    if (branch) match.branch = branch;
+    if (year) match.year = year;
+    if (section) match.section = section;
 
-    const agg = [
-      { $match: match },
-      { $unwind: '$schedule' },
-      { $match: { 'schedule.day': day, 'schedule.timeSlot': slot } },
-      {
-        $project: {
-          teacherId1: '$schedule.teacher.id',
-          teacherId2: '$schedule.teacher._id',
-          teacherId3: '$schedule.teacherId',
-          teacherUsername: '$schedule.teacher.username',
-          teacherName: '$schedule.teacher.name'
-        }
+   // --- PATCH START ---
+// aggregate teachers busy in this day+slot with class context
+const agg = [
+  { $match: match },
+  { $unwind: "$schedule" },
+  {
+    $match: {
+      "schedule.day": day,
+      "schedule.timeSlot": slot
+    }
+  },
+  {
+    $project: {
+      teacherId_field: { $ifNull: ["$schedule.teacher._id", "$schedule.teacher.id"] },
+      teacherAltId: "$schedule.teacherId",
+      teacherUsername: "$schedule.teacher.username",
+      teacherName: "$schedule.teacher.name",
+      year: 1,
+      branch: 1,
+      section: 1,
+      subject: {
+        $ifNull: [
+          "$schedule.subject.acronym",
+          "$schedule.subject.name"
+        ]
       },
-      {
-        $addFields: {
-          teacherCandidate: {
-            $ifNull: ['$teacherId1', { $ifNull: ['$teacherId2', '$teacherId3'] }]
-          }
-        }
+      type: "$schedule.type",
+      timeSlot: "$schedule.timeSlot"
+    }
+  },
+  {
+    $addFields: {
+      teacherCandidate: {
+        $ifNull: [
+          "$teacherId_field",
+          { $ifNull: ["$teacherAltId", "$teacherUsername"] }
+        ]
       },
-      {
-        $group: {
-          _id: null,
-          teachers: { $addToSet: '$teacherCandidate' },
-          usernames: { $addToSet: '$teacherUsername' }
-        }
-      }
-    ]
+      classLabel: {
+        $concat: [
+          { $ifNull: ["$year", ""] },
+          " ",
+          { $ifNull: ["$branch", ""] },
+          "-",
+          { $ifNull: ["$section", ""] }
+        ]
+      },
+     classDetail: {
+  $concat: [
+    { $ifNull: ["$subject", "Class"] },
+    " • ",
+    {
+      $cond: [
+        { $eq: ["$type", "Split Lab (B1/B2)"] },
+        "Split Lab (B1/B2)",
+        { $ifNull: ["$type", "Lecture"] }
+      ]
+    },
+    " • ",
+    { $ifNull: ["$timeSlot", ""] }
+  ]
+}
 
-    const out = await Timetable.aggregate(agg).allowDiskUse(true)
-    const rawList = (out[0]?.teachers || []).filter(Boolean).map(String)
-    const usernames = (out[0]?.usernames || []).filter(Boolean).map(String)
-    // prefer DB ids, but return both fields so frontend can choose
-    return res.json({ success: true, busyTeachers: rawList, busyTeacherUsernames: usernames })
-  } catch (err) {
-    console.error('getBusyTeachersForSlot error', err)
-    return res.status(500).json({ success: false, message: err.message || 'Server error' })
+    }
+  },
+  {
+    $group: {
+      _id: "$teacherCandidate",
+      name: { $first: "$teacherName" },
+      username: { $first: "$teacherUsername" },
+      teacherAltId: { $first: "$teacherAltId" },
+      classLabel: { $first: "$classLabel" },
+      classDetail: { $first: "$classDetail" }
+    }
+  },
+  {
+  $project: {
+    _id: 0,
+    id: { $toString: "$_id" },
+    name: 1,
+    username: 1,
+    teacherId: "$teacherAltId",
+    busy: { $literal: true },
+
+    // ✅ Fix 1: Compute and return classInfo directly
+    classInfo: {
+  $trim: {
+    input: {
+      $concat: [
+        { $ifNull: ["$classLabel", ""] },
+        {
+          $cond: [
+            { $and: [{ $ne: ["$classDetail", null] }, { $ne: ["$classDetail", ""] }] },
+            { $concat: [" (", "$classDetail", ")"] },
+            ""
+          ]
+        }
+      ]
+    }
+  }
+},
+
+
+    // ✅ Fix 2: Keep fields separate too (debug-friendly)
+    classLabel: 1,
+    classDetail: 1
   }
 }
+
+  
+];
+
+const busyTeachers = await Timetable.aggregate(agg).allowDiskUse(true);
+// --- PATCH END ---
+
+
+    // For backward compatibility: list of string ids
+    const rawList = busyTeachers.map(t => String(t.id)).filter(Boolean);
+    const usernames = busyTeachers.map(t => t.username).filter(Boolean);
+
+    return res.json({
+      success: true,
+      busyTeachers: rawList,
+      busyTeacherUsernames: usernames,
+      busyTeachersDetails: busyTeachers
+    });
+  } catch (err) {
+    console.error('getBusyTeachersForSlot error', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+};
 
 /**
  * GET /api/timetable/teacher/:id  OR /api/timetable/teacher?teacherId=<idOrUsername>

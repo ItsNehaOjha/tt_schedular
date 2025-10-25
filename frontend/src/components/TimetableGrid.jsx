@@ -1,6 +1,6 @@
-  // frontend/src/components/TimetableGrid.jsx
+// frontend/src/components/TimetableGrid.jsx
   import React, { useState, useEffect, useMemo } from 'react'
-  import { ArrowLeft, RotateCcw, Minus, Plus, Download, Save, Undo2, Share, X, Edit } from 'lucide-react'
+  import { ArrowLeft, RotateCcw, Minus, Plus, Download, Save, Undo2, Share, X, Edit,Trash2 } from 'lucide-react'
   import { motion } from 'framer-motion'
   import EditModal from "../components/EditModal";
   import toast from 'react-hot-toast'
@@ -278,6 +278,26 @@
         setEditingCell({ day, timeSlot, data: cellData })
       }
     }
+    // 🗑️ Clears a single timetable cell
+const handleClearCell = (day, timeSlot) => {
+  const newSchedule = { ...scheduleData }
+  if (!newSchedule[day]) return
+  const currentCell = newSchedule[day][timeSlot]
+
+  // If it's a lab → also clear continuation slot
+  if (currentCell?.type === 'lab' || currentCell?.isLabSession) {
+    const currentIndex = timeSlots.indexOf(timeSlot)
+    const nextSlot = timeSlots[currentIndex + 1]
+    if (nextSlot && newSchedule[day][nextSlot]?.isContinuation) {
+      newSchedule[day][nextSlot] = { subject: '', teacher: '', type: 'lecture', room: '' }
+    }
+  }
+
+  newSchedule[day][timeSlot] = { subject: '', teacher: '', type: 'lecture', room: '' }
+  setScheduleData(newSchedule)
+  toast.success('Cell cleared successfully')
+}
+
 
     const handleSaveCell = (cellData) => {
       const newSchedule = { ...scheduleData }
@@ -299,7 +319,7 @@
         return
       }
 
-      // split-lab logic
+      // split-lab logic - fixed to occupy exactly 2 consecutive slots
       if (cellData.type === 'split-lab' && cellData.parallelSessions) {
         const currentSlotIndex = timeSlots.indexOf(editingCell.timeSlot)
         const nextSlotIndex = currentSlotIndex + 1
@@ -308,15 +328,19 @@
           const nextSlotData = newSchedule[editingCell.day][nextSlot]
           const isNextSlotEmpty = !nextSlotData || (!nextSlotData.subject && !nextSlotData.teacher)
           if (isNextSlotEmpty) {
+            // Set the current slot with split-lab data
             newSchedule[editingCell.day][editingCell.timeSlot] = {
               type: 'split-lab',
               parallelSessions: cellData.parallelSessions,
               isMerged: true,
-              mergeRows: 2,
-              isLabSession: true
+              mergeRows: 2, // Exactly 2 rows
+              isLabSession: true,
+              // Mark as first slot for styling
             }
+            // Mark the next slot as hidden (part of the split-lab)
             newSchedule[editingCell.day][nextSlot] = {
               type: 'split-lab-hidden',
+              
               isHidden: true,
               isContinuation: true
             }
@@ -333,7 +357,7 @@
         }
       }
 
-      // multi-slot lab (2-hour)
+      // multi-slot lab (2-hour) - fixed to occupy exactly 2 consecutive slots
       if (cellData.isLabSession && cellData.requiresMultipleSlots && cellData.type !== 'split-lab') {
         const currentSlotIndex = timeSlots.indexOf(editingCell.timeSlot)
         const nextSlotIndex = currentSlotIndex + 1
@@ -342,6 +366,7 @@
           const nextSlotData = newSchedule[editingCell.day][nextSlot]
           const isNextSlotEmpty = !nextSlotData || (!nextSlotData.subject && !nextSlotData.teacher)
           if (isNextSlotEmpty) {
+            // Set the current slot with lab data
             newSchedule[editingCell.day][editingCell.timeSlot] = {
               subject: cellData.subject,
               teacher: cellData.teacher,
@@ -349,8 +374,10 @@
               type: cellData.type,
               room: cellData.room,
               code: cellData.code,
-              name: cellData.name
+              name: cellData.name,
+              // Mark as first slot for styling
             }
+            // Mark the next slot as continuation
             newSchedule[editingCell.day][nextSlot] = {
               subject: `${cellData.subject} (Cont.)`,
               teacher: cellData.teacher,
@@ -359,7 +386,8 @@
               room: cellData.room,
               code: cellData.code,
               name: cellData.name,
-              isContinuation: true
+              isContinuation: true,
+              // Hide this slot as it's part of the merged cell
             }
 
             setScheduleData(newSchedule)
@@ -542,11 +570,19 @@
     }
 
     const addDay = () => {
-      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-      const availableDays = dayNames.filter(day => !days.includes(day))
+      const orderedDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      const availableDays = orderedDayNames.filter(day => !days.includes(day))
       if (availableDays.length === 0) return
+      
+      // Find the first available day in the ordered list
       const newDay = availableDays[0]
-      const newDays = [...days, newDay]
+      
+      // Create a new array with all days (current + new) and sort according to the ordered list
+      const unsortedDays = [...days, newDay]
+      const newDays = unsortedDays.sort((a, b) => {
+        return orderedDayNames.indexOf(a) - orderedDayNames.indexOf(b)
+      })
+      
       setDays(newDays)
       const newSchedule = { ...scheduleData }
       newSchedule[newDay] = {}
@@ -738,10 +774,47 @@
     const getCellContent = (day, timeSlot) => {
       const cellData = scheduleData[day]?.[timeSlot]
       if (!cellData || (!cellData.subject && !cellData.teacher && !cellData.parallelSessions)) return { isEmpty: true }
+      
+      // Handle split-lab cells
       if (cellData.type === 'split-lab' && cellData.parallelSessions) {
-        return { isEmpty: false, type: 'split-lab', parallelSessions: cellData.parallelSessions, isMerged: true, mergeRows: 2 }
+        return { 
+          isEmpty: false, 
+          type: 'split-lab', 
+          parallelSessions: cellData.parallelSessions, 
+          isMerged: true, 
+          mergeRows: 2 
+        }
       }
-      return { isEmpty: false, subject: cellData.subject || '', teacher: cellData.teacher || '', type: cellData.type || 'lecture', room: cellData.room || '', code: cellData.code || '', duration: cellData.duration || 1, isFirstSlot: cellData.isFirstSlot, isContinuation: cellData.isContinuation, isHidden: cellData.isHidden }
+      
+      // Handle regular lab cells with mergeRows
+      if (cellData.type === 'lab' && cellData.isMerged) {
+        return { 
+          isEmpty: false, 
+          subject: cellData.subject || '', 
+          teacher: cellData.teacher || '', 
+          type: cellData.type || 'lab', 
+          room: cellData.room || '', 
+          code: cellData.code || '', 
+          isMerged: true,
+          mergeRows: cellData.mergeRows || 2
+        }
+      }
+      
+      // Handle all other cell types
+      return { 
+        isEmpty: false, 
+        subject: cellData.subject || '', 
+        teacher: cellData.teacher || '', 
+        type: cellData.type || 'lecture', 
+        room: cellData.room || '', 
+        code: cellData.code || '', 
+        duration: cellData.duration || 1, 
+        isFirstSlot: cellData.isFirstSlot, 
+        isContinuation: cellData.isContinuation, 
+        isHidden: cellData.isHidden,
+        isMerged: cellData.isMerged,
+        mergeRows: cellData.mergeRows
+      }
     }
 
     const getCellStyling = (type, subject) => {
@@ -1005,11 +1078,12 @@
                 </thead>
                 <tbody>
                   {timeSlots.map((timeSlot, rowIndex) => {
-                    const shouldSkipRow = days.some(day => {
-                      const cellData = scheduleData[day]?.[timeSlot]
-                      return cellData?.isHidden || cellData?.type === 'split-lab-continuation'
-                    })
-                    if (shouldSkipRow) return null
+                    // Handle shouldSkipRow logic for hidden cells
+      const shouldSkipRow = days.some(day => {
+        const cellData = scheduleData[day]?.[timeSlot]
+        return cellData?.isHidden || cellData?.type === 'split-lab-continuation'
+      })
+      if (shouldSkipRow) return null
 
                     return (
                       <tr key={timeSlot}>
@@ -1031,10 +1105,79 @@
                           if (cellContent.isHidden) return null
 
                           return (
-                            <td key={`${day}-${timeSlot}`} className={`border border-gray-300 p-1 text-xs cursor-pointer transition-colors hover:bg-gray-50 ${(cellContent.type === 'split-lab') ? 'bg-violet-50 border-violet-200' : cellStyling.bgColor}`} rowSpan={cellContent.isMerged ? cellContent.mergeRows : 1} onClick={() => (isEditable || mode === 'edit' || mode === 'create') && handleCellClick(day, timeSlot)} style={{ verticalAlign: 'middle', ...(cellContent.isMerged && { borderRadius: '6px', backgroundColor: '#f5f3ff', border: '1px solid #c4b5fd' }) }}>
+                            <td
+  key={`${day}-${timeSlot}`}
+  className={`relative border border-gray-300 p-1 text-xs cursor-pointer transition-colors hover:bg-gray-50 ${(cellContent.type === 'split-lab') ? 'bg-violet-50 border-violet-200' : cellStyling.bgColor}`}
+  rowSpan={cellContent.isMerged ? cellContent.mergeRows : 1}
+  onClick={() => (isEditable || mode === 'edit' || mode === 'create') && handleCellClick(day, timeSlot)}
+  style={{ verticalAlign: 'middle', ...(cellContent.isMerged && { borderRadius: '6px', backgroundColor: '#f5f3ff', border: '1px solid #c4b5fd' }) }}
+>
+
                               <div className="min-h-[60px] flex flex-col justify-center items-center text-center">
-                                {cellContent.isEmpty ? (<div className="h-full flex items-center justify-center text-gray-400 text-sm">Click to add</div>) : (['lunch', 'break', 'library', 'mini project', 'mentor'].includes(cellContent.type) ? (<div className="h-full flex items-center justify-center"><span className="font-bold text-center text-gray-800">{cellContent.subject || cellContent.type.toUpperCase()}</span></div>) : cellContent.type === 'split-lab' && cellContent.parallelSessions ? (<div className="flex flex-col text-sm p-2 space-y-2">{cellContent.parallelSessions.map((session, idx) => (<div key={idx} className="py-1 border-b border-violet-200 last:border-b-0"><div className="font-semibold text-violet-700">{session.subject} LAB ({session.batch})</div><div className="text-xs text-gray-600">{session.code} - {session.teacher}</div></div>))}<div className="text-xs mt-1 text-gray-500 italic">Room: {cellContent.parallelSessions.map(s => s.room).filter(Boolean).join(' & ') || 'TBD'}</div></div>) : (<div className="p-2 h-full flex flex-col justify-center"><div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>{cellContent.code && (<div className="text-xs text-gray-500 truncate">{cellContent.code}</div>)}{cellContent.teacher && (<div className="text-xs text-gray-600 truncate">{cellContent.teacher}</div>)}{cellContent.room && (<div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>)}{cellContent.duration === 2 && (<div className="text-xs text-blue-600 font-medium">{cellContent.isFirstSlot ? '2hr Lab' : 'Cont.'}</div>)}</div>))}
-                              </div>
+                                {/* Content rendering for all cell types */}
+{cellContent.isEmpty ? (
+  <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+    Click to add
+  </div>
+) : (
+  <div className="p-2 h-full flex flex-col justify-center items-center text-center relative">
+
+    {/* Handle type-specific display */}
+    {['lunch', 'break', 'library', 'mini project', 'mentor'].includes(cellContent.type) ? (
+      <span className="font-bold text-gray-800">
+        {cellContent.subject || cellContent.type.toUpperCase()}
+      </span>
+    ) : cellContent.type === 'split-lab' && cellContent.parallelSessions ? (
+      <div className="flex flex-col text-sm p-2 space-y-2">
+        {cellContent.parallelSessions.map((session, idx) => (
+          <div key={idx} className="py-1 border-b border-violet-200 last:border-b-0">
+            <div className="font-semibold text-violet-700">{session.subject} LAB ({session.batch})</div>
+            <div className="text-xs text-gray-600">{session.code} - {session.teacher}</div>
+          </div>
+        ))}
+        <div className="text-xs mt-1 text-gray-500 italic">
+          Room: {cellContent.parallelSessions.map(s => s.room).filter(Boolean).join(' & ') || 'TBD'}
+        </div>
+      </div>
+    ) : (
+      <>
+        <div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>
+        {cellContent.code && <div className="text-xs text-gray-500 truncate">{cellContent.code}</div>}
+        {cellContent.teacher && <div className="text-xs text-gray-600 truncate">{cellContent.teacher}</div>}
+        {cellContent.room && <div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>}
+      </>
+    )}
+
+    
+
+  </div>
+)}
+
+                                {/* 📍 Room info */}
+{cellContent.room && (
+  <div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>
+)}
+
+{/* 🗑️ Trash icon visible on all non-empty cell types */}
+{!cellContent.isEmpty && (isEditable || mode === 'edit' || mode === 'create') && (
+  <button
+    onClick={(e) => { e.stopPropagation(); handleClearCell(day, timeSlot) }}
+    className="absolute top-1 right-1 p-1 rounded hover:bg-red-100 text-red-500"
+    title="Clear this cell"
+  >
+    <Trash2 className="w-3 h-3" />
+  </button>
+)}
+
+
+                                {cellContent.duration === 2 && (
+  <div className="text-xs text-blue-600 font-medium">
+    {cellContent.isFirstSlot ? '2hr Lab' : 'Cont.'}
+  </div>
+)}
+</div>
+
+                              
                             </td>
                           )
                         })}
@@ -1062,16 +1205,76 @@
                       <div key={timeSlot} className={`p-3 ${cellStyling.bgColor} ${(isEditable || mode === 'edit' || mode === 'create') ? 'cursor-pointer hover:bg-gray-50' : ''}`} onClick={() => (isEditable || mode === 'edit' || mode === 'create') && handleCellClick(day, timeSlot)}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-gray-600">{timeSlot}</span>
-                          {(isEditable || mode === 'edit' || mode === 'create') && (
+                          {(scheduleData[day]?.[timeSlot]?.subject || scheduleData[day]?.[timeSlot]?.teacher) &&
+ (isEditable || mode === 'edit' || mode === 'create') && (
+  <button
+    onClick={(e) => { e.stopPropagation(); handleClearCell(day, timeSlot) }}
+    className="p-1 rounded hover:bg-red-100 text-red-500"
+    title="Clear this cell"
+  >
+    <Trash2 className="w-3 h-3" />
+  </button>
+)}
+
+                          {/* {(isEditable || mode === 'edit' || mode === 'create') && (
                             <div className="flex space-x-1">
                               <button onClick={(e) => { e.stopPropagation(); setEditingTimeSlot({ index, timeSlot }) }} className="p-1 text-blue-500 hover:bg-blue-100 rounded" title="Edit Time Slot"><Edit className="w-3 h-3" /></button>
                               {timeSlots.length > 1 && (<button onClick={(e) => { e.stopPropagation(); removeTimeSlot(timeSlot) }} className="p-1 text-red-500 hover:bg-red-100 rounded" title="Remove Time Slot"><Minus className="w-3 h-3" /></button>)}
                             </div>
-                          )}
+                          )} */}
                         </div>
 
                         <div className="text-center">
-                          {cellContent.isEmpty ? (<div className="h-full flex items-center justify-center text-gray-400 text-sm">Tap to add class</div>) : (['lunch', 'break', 'library', 'mini project', 'mentor'].includes(cellContent.type) ? (<div className="h-full flex items-center justify-center"><span className="font-bold text-center text-gray-800">{cellContent.subject || cellContent.type.toUpperCase()}</span></div>) : (<div className="p-2 h-full flex flex-col justify-center"><div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>{cellContent.code && (<div className="text-xs text-gray-500 truncate">{cellContent.code}</div>)}{cellContent.teacher && (<div className="text-xs text-gray-600 truncate">{cellContent.teacher}</div>)}{cellContent.room && (<div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>)}{cellContent.duration === 2 && (<div className="text-xs text-blue-600 font-medium">{cellContent.isFirstSlot ? '2hr Lab' : 'Cont.'}</div>)}</div>))}
+                         {/* Content rendering for all cell types */}
+{cellContent.isEmpty ? (
+  <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+    Click to add
+  </div>
+) : (
+  <div className="p-2 h-full flex flex-col justify-center items-center">
+    {/* Handle type-specific display */}
+    {['lunch', 'break', 'library', 'mini project', 'mentor'].includes(cellContent.type) ? (
+      <span className="font-bold text-center text-gray-800">
+        {cellContent.subject || cellContent.type.toUpperCase()}
+      </span>
+    ) : cellContent.type === 'split-lab' && cellContent.parallelSessions ? (
+      <div className="flex flex-col text-sm p-2 space-y-2">
+        {cellContent.parallelSessions.map((session, idx) => (
+          <div key={idx} className="py-1 border-b border-violet-200 last:border-b-0">
+            <div className="font-semibold text-violet-700">
+              {session.subject} LAB ({session.batch})
+            </div>
+            <div className="text-xs text-gray-600">
+              {session.code} - {session.teacher}
+            </div>
+          </div>
+        ))}
+        <div className="text-xs mt-1 text-gray-500 italic">
+          Room: {cellContent.parallelSessions.map(s => s.room).filter(Boolean).join(' & ') || 'TBD'}
+        </div>
+      </div>
+    ) : (
+      <>
+        <div className="font-medium text-sm text-gray-900 truncate">{cellContent.subject}</div>
+        {cellContent.code && <div className="text-xs text-gray-500 truncate">{cellContent.code}</div>}
+        {cellContent.teacher && <div className="text-xs text-gray-600 truncate">{cellContent.teacher}</div>}
+        {cellContent.room && <div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>}
+      </>
+    )}
+
+    {/* 🗑️ Trash icon — shown for ALL non-empty cells */}
+    {(isEditable || mode === 'edit' || mode === 'create') && (
+      <button
+        onClick={(e) => { e.stopPropagation(); handleClearCell(day, timeSlot) }}
+        className="absolute top-1 right-1 p-1 rounded hover:bg-red-100 text-red-500"
+        title="Clear this cell"
+      >
+        <Trash2 className="w-3 h-3" />
+      </button>
+    )}
+  </div>
+)}
+
                         </div>
                       </div>
                     )
@@ -1090,5 +1293,6 @@
       </div>
     )
   }
+
 
   export default TimetableGrid

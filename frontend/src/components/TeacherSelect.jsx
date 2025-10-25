@@ -198,14 +198,33 @@ export default function TeacherSelect({
                   onClick={() => !isBusy && handlePick(t)}
                   style={{ ...styles.item, ...(isBusy ? styles.itemBusy : {}) }}
                 >
-                  <div style={styles.itemLine1}>
-                    <span>{t.name}</span>
-                    {isBusy && <span style={styles.busyBadge}>BUSY</span>}
-                  </div>
-                  <div style={styles.itemLine2}>
-                    <span>{t.department || "—"}</span>
-                    {t.teacherId && <span> • {t.teacherId}</span>}
-                  </div>
+                 <div style={styles.itemLine1}>
+                      <span>{t.name}</span>
+                      {isBusy && <span style={styles.busyBadge}>BUSY</span>}
+                    </div>
+
+                    <div style={styles.itemLine2}>
+                      <span>{t.department || "—"}</span>
+                      {t.teacherId && <span> • {t.teacherId}</span>}
+                    </div>
+
+                    {/* 🧩 Add visible class info below busy teacher */}
+                    {isBusy && (
+  <>
+    {t.classLabel && (
+      <div style={{ fontSize: 11, color: "#b10000", marginTop: 2 }}>
+        {t.classLabel}
+      </div>
+    )}
+    {t.classDetail && (
+      <div style={{ fontSize: 10, color: "#d33", opacity: 0.8 }}>
+        {t.classDetail}
+      </div>
+    )}
+  </>
+)}
+
+
                 </div>
               );
             })}
