@@ -1170,10 +1170,6 @@ if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
   </div>
 )}
 
-                                {/* 📍 Room info */}
-{cellContent.room && (
-  <div className="text-xs text-gray-500 truncate">📍 {cellContent.room}</div>
-)}
 
 {/* 🗑️ Trash icon visible on all non-empty cell types */}
 {!cellContent.isEmpty && (isEditable || mode === 'edit' || mode === 'create') && (

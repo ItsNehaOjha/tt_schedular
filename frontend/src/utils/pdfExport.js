@@ -5,7 +5,8 @@ import logo from "../asset/ims-logo.png"; // <-- Place your logo inside /src/ass
 
 export const exportToPDF = (timetableData) => {
   try {
-    const doc = new jsPDF("landscape", "pt", "a4");
+    const doc = new jsPDF("landscape", "pt", [842, 800]);
+
 
     // ---------- Header Section ----------
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -40,62 +41,88 @@ export const exportToPDF = (timetableData) => {
    const getCompactSubjectName = (subjectName = "") => {
   if (!subjectName) return "";
 
-  const cleanName = subjectName.replace(/\(.*continued.*\)/i, "").trim();
+  const clean = subjectName
+   // Removes anything like (continued), (Continued), (contd), (Contd.), or stray brackets
+.replace(/\(.*(continued|contd).*?\)/gi, "")
+.replace(/\(.*\)/g, "") // remove any leftover bracketed noise
 
-  // 🧩 Direct special mappings (priority)
-  const special = {
-    "Web Technology": "WT",
-    "Database Management System": "DBMS",
-    "Operating System": "OS",
-    "Machine Learning": "ML",
-    "Data Analysis": "DA",
-    Anudip: "Anudip",
-    Library: "Library",
-    Break: "Break",
-    Lunch: "Lunch",
-    "Mini Project": "Mini Project",
-    Mentor: "Mentor",
-  };
+    .replace(/\s+/g, " ")
+    .trim();
 
-  for (const key in special) {
-    if (cleanName.toLowerCase().includes(key.toLowerCase())) return special[key];
-  }
+  // 🧠 Predefined precise mappings
+ const predefined = {
+  // ✅ Strong mappings for all possible forms
+  "database management system": "DBMS",
+  "dbms": "DBMS",
+  "dbmslab": "DBMS Lab",
+  "dbms lab": "DBMS Lab",
 
-  const words = cleanName.split(/\s+/).filter((w) => w.length > 2);
+  "web technology": "WT",
+  "wt": "WT",
+  "wtlab": "WT Lab",
+  "web tech lab": "WT Lab",
 
-  // 🧠 Case 1: Single short word (<= 8 chars) → show full word
-  if (words.length === 1 && cleanName.length <= 8) {
-    return cleanName;
-  }
+  "data analytics": "DA",
+  "data analysis": "DA",
+  "da lab": "DA Lab",
+  "dalab": "DA Lab",
 
-  // 🧠 Case 2: Single long word (> 8 chars) → shorten smartly
-  if (words.length === 1 && cleanName.length > 8) {
-    return cleanName.substring(0, 5).toUpperCase(); // e.g., "Programming" → "PROGR"
-  }
+  "design and analysis of algorithm": "DAA",
+  "daa": "DAA",
+  "daa lab": "DAA Lab",
 
-  // 🧩 Case 3: Multi-word → use acronym (up to 3 chars)
-  const acronym = words.map((w) => w[0].toUpperCase()).slice(0, 3).join("");
+  "machine learning": "ML",
+  "ml": "ML",
+  "ml lab": "ML Lab",
 
-  // 🧩 Fallback: use first 3 letters
-  return acronym || cleanName.substring(0, 3).toUpperCase();
+  "indian tradition culture and society": "ITCS",
+  "itcs": "ITCS",
+
+  "anudip": "Anudip",
+  "Anudip (Continued)": "Anudip",
+  "mini project": "Mini Project",
+  "mentor": "Mentor",
+  "library": "Library",
+  "break": "Break",
+  "lunch": "Lunch",
 };
+
+  const lower = clean.toLowerCase();
+
+ for (const key in predefined) {
+  if (lower === key || lower.includes(` ${key} `)) {
+    const base = predefined[key];
+    if (lower.includes("lab") && !base.toLowerCase().includes("lab")) {
+      return `${base} Lab`;
+    }
+    return base;
+  }
+}
+
+
+  // fallback acronym for unmapped subjects
+  const words = clean.split(" ").filter(Boolean);
+  if (words.length === 1) {
+    return clean.length <= 6 ? clean.toUpperCase() : clean.substring(0, 5).toUpperCase();
+  }
+
+  let acronym = words.map((w) => w[0].toUpperCase()).join("");
+  if (acronym.length > 5) acronym = acronym.substring(0, 5);
+  return lower.includes("lab") ? `${acronym} Lab` : acronym;
+};
+
+
 
 
   const formatTeacherName = (fullName = "") => {
   if (!fullName) return "";
-  const clean = fullName.trim().replace(/\s{2,}/g, " ");
-  const parts = clean.split(" ");
-
-  // Keep only the first name (ignore last name)
-  const firstName = parts.length > 1 ? parts[1] : parts[0];
-
-  // Detect prefixes properly
-  if (/^(Mr|Ms|Mrs|Dr|Prof)\.?$/i.test(parts[0])) {
-    return `${parts[0].replace(".", "")}. ${firstName}`;
-  }
-
-  return `Mr. ${parts[0]}`; // Default fallback
+  const clean = fullName
+    .replace(/(Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)/gi, "")
+    .trim();
+  const parts = clean.split(" ").filter(Boolean);
+  return parts.length > 0 ? parts[0] : clean;
 };
+
 
 
 
@@ -103,10 +130,45 @@ export const exportToPDF = (timetableData) => {
   const row = [slot];
   days.forEach((day) => {
     const cell = schedule[day]?.[slot];
+    // 🧠 Skip continuation or hidden cells from split-labs
+if (cell.isContinuation || cell.sameGroup) return;
+
     if (!cell || (!cell.subject && !cell.teacher)) {
       row.push("");
       return;
     }
+
+    // 🧩 Handle split-lab case with deduplication
+if (
+  cell &&
+  cell.type === "split-lab" &&
+  Array.isArray(cell.parallelSessions) &&
+  cell.parallelSessions.length > 0
+) {
+
+  let cellText = "";
+  const addedRooms = new Set();
+
+  cell.parallelSessions.forEach((session, idx) => {
+    if (idx > 0) cellText += "\n---\n";
+
+    const subjName = getCompactSubjectName(session.subject);
+    const subjCode = session.code || "";
+    const teacher = formatTeacherName(session.teacher);
+    const room = session.room || "";
+
+    cellText += `${session.batch || ""}: ${subjName}`;
+    if (subjCode) cellText += `\n(${subjCode})`;
+    if (teacher) cellText += `\n${teacher}`;
+    if (room && !addedRooms.has(room)) {
+      cellText += `\n${room}`;
+      addedRooms.add(room);
+    }
+  });
+
+  row.push(cellText.trim());
+  return; // skip normal single-cell logic
+}
 
     // 🧩 Unified subject/code extraction (handles both nested + flat formats)
 const subj =
@@ -154,7 +216,7 @@ const subjectCode = subj.code?.trim() || cell.code?.trim() || "";
         fontSize: 8,
         halign: "center",
         valign: "middle",
-        cellPadding: 2,
+        cellPadding: { top: 10, bottom: 10 },
       },
       headStyles: {
         fillColor: [41, 128, 185],
@@ -165,13 +227,20 @@ const subjectCode = subj.code?.trim() || cell.code?.trim() || "";
         0: { fillColor: [230, 230, 230], fontStyle: "bold", cellWidth: 85 },
       },
       didParseCell: function (data) {
-        if (data.section === "body" && data.column.index > 0) {
-          const day = days[data.column.index - 1];
-          const time = timeSlots[data.row.index];
-          const cell = schedule?.[day]?.[time];
-          if (cell) data.cell.styles.fillColor = typeColors[cell.type] || typeColors.default;
-        }
-      },
+  if (data.section === "body" && data.column.index > 0) {
+    const day = days[data.column.index - 1];
+    const time = timeSlots[data.row.index];
+    const cell = schedule?.[day]?.[time];
+
+    if (cell && cell.type) {
+      data.cell.styles.fillColor = typeColors[cell.type] || typeColors.default;
+    } else {
+      // 🩵 Default color for blank cells (pure white)
+      data.cell.styles.fillColor = [255, 255, 255];
+    }
+  }
+},
+
     });
 
     // ---------- Legend ----------
@@ -212,7 +281,7 @@ const subjectCode = subj.code?.trim() || cell.code?.trim() || "";
   fontSize: 9,
   halign: "center",
   valign: "middle",
-  cellPadding: { top: 10, right: 6, bottom: 10, left: 6 },  // ✅ more breathing space
+  cellPadding: { top: 10, right: 4, bottom: 10, left: 4 },  // ✅ more breathing space
   lineWidth: 0.2,
   lineHeight: 1.2,
   lineColor: [180, 180, 180],
