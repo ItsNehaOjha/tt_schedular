@@ -23,6 +23,7 @@ export default function TeacherSelect({
   const [query, setQuery] = useState("");
   const [teachers, setTeachers] = useState([]);
   const [busyIds, setBusyIds] = useState(new Set());
+  const [teacherDetailsMap, setTeacherDetailsMap] = useState(new Map());
   const [loading, setLoading] = useState(false);
   const [loadErr, setLoadErr] = useState("");
   const [busyLoading, setBusyLoading] = useState(false);
@@ -89,7 +90,32 @@ export default function TeacherSelect({
           },
         });
         if (!alive) return;
-        setBusyIds(new Set((res.data?.busyTeachers || []).map(String)));
+        
+        // Store busy teacher details for displaying class and section info
+        const busyTeacherDetails = res.data?.busyTeachersDetails || [];
+        
+        // Create a map of teacher IDs to their class details
+        const teacherDetailsMap = new Map();
+        busyTeacherDetails.forEach(teacher => {
+          const teacherId = String(teacher.id || teacher.teacherId || teacher._id);
+          if (teacherId) {
+            teacherDetailsMap.set(teacherId, {
+              classLabel: teacher.classLabel || `${teacher.year || ''} ${teacher.branch || ''}-${teacher.section || ''}`,
+              classDetail: teacher.subject ? `${teacher.subject}${teacher.type ? ` (${teacher.type})` : ''}` : ''
+            });
+          }
+        });
+        
+        // Handle both array of strings and array of objects with id property
+        const busyTeachers = res.data?.busyTeachers || [];
+        const busyTeacherIds = busyTeachers.map(teacher => 
+          typeof teacher === 'object' && teacher !== null 
+            ? String(teacher.id || teacher._id) 
+            : String(teacher)
+        );
+        
+        setBusyIds(new Set(busyTeacherIds));
+        setTeacherDetailsMap(teacherDetailsMap);
       } catch (err) {
         if (!alive) return;
         console.warn("TeacherSelect: busy check failed (non-blocking)", err);
@@ -208,21 +234,19 @@ export default function TeacherSelect({
                       {t.teacherId && <span> • {t.teacherId}</span>}
                     </div>
 
-                    {/* 🧩 Add visible class info below busy teacher */}
-                    {isBusy && (
-  <>
-    {t.classLabel && (
-      <div style={{ fontSize: 11, color: "#b10000", marginTop: 2 }}>
-        {t.classLabel}
-      </div>
-    )}
-    {t.classDetail && (
-      <div style={{ fontSize: 10, color: "#d33", opacity: 0.8 }}>
-        {t.classDetail}
-      </div>
-    )}
-  </>
-)}
+                    {/* Display class and section information for busy teachers */}
+                    {isBusy && teacherDetailsMap.has(String(t.id)) && (
+                      <>
+                        <div style={styles.busyClassLabel}>
+                          Busy in: {teacherDetailsMap.get(String(t.id)).classLabel}
+                        </div>
+                        {teacherDetailsMap.get(String(t.id)).classDetail && (
+                          <div style={styles.busyClassDetail}>
+                            {teacherDetailsMap.get(String(t.id)).classDetail}
+                          </div>
+                        )}
+                      </>
+                    )}
 
 
                 </div>
@@ -267,5 +291,7 @@ const styles = {
   itemLine1: { display: "flex", alignItems: "center", justifyContent: "space-between", fontWeight: 600, fontSize: 14 },
   itemLine2: { fontSize: 12, color: "#666", marginTop: 2 },
   busyBadge: { fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: "#ffe3e3", color: "#b10000", marginLeft: 8 },
+  busyClassLabel: { fontSize: 11, color: "#b10000", marginTop: 2, fontWeight: 500 },
+  busyClassDetail: { fontSize: 10, color: "#d33", opacity: 0.8 },
   empty: { padding: 10, color: "#777", textAlign: "center" },
 };

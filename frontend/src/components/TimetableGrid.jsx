@@ -7,7 +7,7 @@
 
   const TimetableGrid = ({ onBack, onSave, onPublish, data, timetableData, mode, isEditable, showPDFExport = false, savedTimetableId = null, isPublished = false }) => {
     const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    const defaultTimeSlots = ['08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00']
+    const defaultTimeSlots = ['08:50-09:40', '09:40-10:30', '10:30-11:20', '11:20-12:10', '12:10-13:00', '13:00-13:50', '13:50-14:40', '14:40-15:30', '15:30-16:20']
 
     // State management
     const [editingCell, setEditingCell] = useState(null)
@@ -487,7 +487,7 @@ if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
       const lastSlot = timeSlots[timeSlots.length - 1]
       const lastSlotParsed = parseTimeSlot(lastSlot)
       const newStart = lastSlotParsed.end
-      const newEnd = newStart + 60
+      const newEnd = newStart + 50 // Changed from 60 to 50 minutes
       const newSlot = createTimeSlot(newStart, newEnd)
       const newTimeSlots = [...timeSlots, newSlot]
       setTimeSlots(newTimeSlots)

@@ -2,9 +2,30 @@
 import { validationResult } from 'express-validator'
 import Timetable from '../models/Timetable.js'
 import User from '../models/User.js'
+import Subject from '../models/Subject.js'
 import { AppError, asyncHandler } from '../utils/errorHandler.js'
 import { createTimetableNotification } from './notificationController.js'
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+
+// Helper function to check if a teacher is busy at a specific day and time slot
+const isTeacherBusy = async (teacherId, day, timeSlot, excludeSection = null) => {
+  if (!teacherId) return false;
+  
+  const query = {
+    'schedule.day': day,
+    'schedule.timeSlot': timeSlot,
+    'schedule.teacher.id': teacherId
+  };
+  
+  // Exclude the current section if provided
+  if (excludeSection) {
+    query.section = { $ne: excludeSection };
+  }
+  
+  const count = await Timetable.countDocuments(query);
+  return count > 0;
+};
 
 
 /* ============================================================

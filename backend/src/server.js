@@ -8,11 +8,21 @@ dotenv.config()
 // Connect to database
 connectDB()
 
-const PORT = process.env.PORT || 5000 || 5001
+const DEFAULT_PORT = process.env.PORT || 5001;
+const server = app.listen(DEFAULT_PORT, () => {
+  console.log(`Server running on port ${DEFAULT_PORT}`);
+});
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`)
-})
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`Port ${DEFAULT_PORT} is busy, trying another port...`);
+    const newPort = Number(DEFAULT_PORT) + 1;
+    app.listen(newPort, () => console.log(`Server switched to port ${newPort}`));
+  } else {
+    console.error('Server error:', err);
+  }
+});
+
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
