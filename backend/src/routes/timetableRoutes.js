@@ -11,7 +11,9 @@ import {
   publishTimetable,
   deleteTimetable,
   getTimetableStats,
-  getBusyTeachersForSlot
+  getBusyTeachersForSlot,
+  generateSampleTimetable,
+  getDraftTimetable
 } from '../controllers/timetableController.js'
 // import { protect, authorize } from '../middleware/authMiddleware.js'
 
@@ -47,6 +49,7 @@ router.get('/:branch/:section', getTimetableByBranchSection)
 // ---------- PROTECTED (COORDINATOR) ROUTES ----------
 router.get('/stats',  getTimetableStats)
 router.get('/class',  getTimetableByClass)
+router.get('/draft/:id', getDraftTimetable)
 
 // from here on: require auth
 
@@ -57,6 +60,7 @@ router.get('/teacher/:id/timetable', getTeacherTimetable)
 // coordinator-only CRUD
 router.get('/',  getTimetables)
 router.post('/',  timetableValidation, createTimetable)
+router.post('/generate-sample', generateSampleTimetable)
 router.put('/:id',  updateTimetable)
 router.put('/:id/publish',  publishTimetable)
 router.delete('/:id',  deleteTimetable) 

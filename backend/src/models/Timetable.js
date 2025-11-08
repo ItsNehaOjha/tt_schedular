@@ -63,7 +63,7 @@ const timetableSchema = new mongoose.Schema({
     required: [true, 'Year is required'],
     enum: ['1st Year', '2nd Year', '3rd Year', '4th Year']
   },
-  coordinatorName: { type: String, required: true },
+  coordinatorName: { type: String, required: false, default: '' },
 
   branch: {
     type: String,
@@ -102,6 +102,20 @@ revisionHistory: [
   isPublished: {
     type: Boolean,
     default: false
+  },
+  // Newly added fields for generator drafts
+  isDraft: {
+    type: Boolean,
+    default: false
+  },
+  generatedBy: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  metadata: {
+    type: Object,
+    default: {}
   },
   publishedAt: {
     type: Date

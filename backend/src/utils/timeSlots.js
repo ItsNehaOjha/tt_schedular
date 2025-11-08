@@ -1,13 +1,16 @@
 // Canonical keys → display labels. Adjust to your institute timings.
 export const TIME_SLOTS = {
-  TS1: '09:00-10:00',
-  TS2: '10:00-11:00',
-  TS3: '11:00-12:00',
-  TS4: '12:00-13:00',
-  LUNCH: '13:00-14:00',
-  TS5: '14:00-15:00',
-  TS6: '15:00-16:00',
-  TS7: '16:00-17:00'
+  TS1: '08:50-09:40',
+  TS2: '09:40-10:30',
+  TS3: '10:30-11:20',
+  TS4: '11:20-12:10',
+  LUNCH: '12:10-13:00',
+  TS5: '13:00-13:50',
+  TS6: '13:50-14:40',
+  TS7: '14:40-15:30',
+  TS8: '15:30-16:20',
+  TS9: '16:20-17:10',
+  
 };
 
 // Utility (optional) to map display string to key for migration

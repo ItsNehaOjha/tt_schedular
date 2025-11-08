@@ -75,6 +75,7 @@ export const teacherAPI = {
   getTeacherById: (id) => api.get(`/teachers/${id}`),
   // Coordinator routes for teacher management
   getTeachers: () => api.get('/coordinator/teachers'),
+  getAllTeachers: () => api.get('/teachers/list'),
   createTeacher: (data) => api.post('/coordinator/create-teacher', data),
   updateTeacher: (id, data) => api.put(`/coordinator/teachers/${id}`, data),
   deleteTeacher: (id) => api.delete(`/coordinator/teachers/${id}`),
@@ -84,6 +85,8 @@ export const teacherAPI = {
 // Subject API - Updated to match cleaned backend
 export const subjectAPI = {
   getSubjects: (params = {}) => api.get('/subjects', { params }),
+  // Fallback: try branch/semester path style if needed
+  getByBranchSemesterPath: (branch, semester) => api.get(`/subjects/branch/${encodeURIComponent(branch)}/semester/${encodeURIComponent(semester)}`),
   createSubject: (data) => api.post('/subjects', data),
   updateSubject: (id, data) => api.put(`/subjects/${id}`, data),
   deleteSubject: (id) => api.delete(`/subjects/${id}`),
@@ -108,7 +111,9 @@ export const timetableAPI = {
   updateTimetable: (id, data) => api.put(`/timetable/${id}`, data),
   publishTimetable: (id, data) => api.put(`/timetable/${id}/publish`, data),
   deleteTimetable: (id) => api.delete(`/timetable/${id}`),
-  getTimetableStats: () => api.get('/timetable/stats')
+  getTimetableStats: () => api.get('/timetable/stats'),
+  generateSample: (payload) => api.post('/timetable/generate-sample', payload),
+  getDraftById: (id) => api.get(`/timetable/draft/${id}`)
 }
 
 export default api

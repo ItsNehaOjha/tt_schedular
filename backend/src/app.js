@@ -84,6 +84,8 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes)
 app.use('/api/subjects', subjectRoutes)
+// Compat mount to support /api/subject/* style routes expected by some clients
+app.use('/api/subject', subjectRoutes)
 app.use('/api/classes', classRoutes)
 app.use('/api/timetable', timetableRoutes)
 app.use('/api/teachers', teacherRoutes)

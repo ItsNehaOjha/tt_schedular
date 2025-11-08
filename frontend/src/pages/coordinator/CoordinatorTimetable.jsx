@@ -1,10 +1,11 @@
 // src/pages/coordinator/CoordinatorTimetable.jsx
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Calendar, Edit } from 'lucide-react'
+import { ArrowLeft, Calendar, Edit, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TimetableSelector from '../../components/TimetableSelector'
 import TimetableGrid from '../../components/TimetableGrid'
+import SampleTimetableConfigForm from '../../components/SampleTimetableConfigForm'
 import api, { timetableAPI } from '../../utils/api'
 
 const CoordinatorTimetable = () => {
@@ -15,6 +16,10 @@ const CoordinatorTimetable = () => {
 
   const [savedTimetableId, setSavedTimetableId] = useState(null)
   const [isPublished, setIsPublished] = useState(false)
+  
+  // Sample Timetable Config Form state
+  const [showGenerator, setShowGenerator] = useState(false)
+  const [generatedDraftId, setGeneratedDraftId] = useState(null)
 
   // === Helper to unwrap axios responses ===
   const unwrapResponse = (response) => {
@@ -62,6 +67,46 @@ const fetchExistingTimetable = async (classData) => {
   }
 }
 
+
+  // === Sample Timetable Generator Handlers ===
+  const handleOpenGenerator = () => {
+    setShowGenerator(true)
+  }
+
+  const handleCloseGenerator = () => {
+    setShowGenerator(false)
+  }
+
+  const handleGenerationComplete = (draftId) => {
+    setGeneratedDraftId(draftId)
+    setShowGenerator(false)
+    
+    // Fetch the generated draft timetable
+    if (selectedClass && draftId) {
+      fetchDraftTimetable(draftId)
+    }
+  }
+
+  const fetchDraftTimetable = async (draftId) => {
+    try {
+      setLoading(true)
+      const response = await timetableAPI.getDraftById(draftId)
+      const data = unwrapResponse(response)
+      
+      if (data) {
+        setTimetableData(data)
+        setSavedTimetableId(data._id || data.id)
+        setIsPublished(false) // Drafts are not published
+        setCurrentStep('edit') // Move directly to edit mode
+        toast.success('Draft timetable loaded successfully')
+      }
+    } catch (err) {
+      console.error('Fetch draft timetable error:', err)
+      toast.error('Failed to load draft timetable')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // === Load saved state & fetch backend version ===
   useEffect(() => {
@@ -169,8 +214,9 @@ const fetchExistingTimetable = async (classData) => {
 
   // === Save Timetable ===
   const handleSaveTimetable = async (data) => {
+    let toastId
     try {
-      const toastId = toast.loading('Saving timetable...')
+      toastId = toast.loading('Saving timetable...')
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       const coordinatorId = user.id || user._id
       if (!coordinatorId) {
@@ -200,82 +246,40 @@ const fetchExistingTimetable = async (classData) => {
       setTimetableData(saved)
       setSavedTimetableId(saved._id || saved.id)
       setIsPublished(Boolean(saved.isPublished))
-
-      toast.dismiss(toastId)
-      toast.success('Timetable saved successfully!')
-      setCurrentStep('grid')
-      return saved
+      toast.success('Timetable saved')
     } catch (err) {
-      console.error('Save error:', err)
+      console.error('Save timetable error:', err)
       toast.error('Failed to save timetable')
-      throw err
+    } finally {
+      if (toastId) toast.dismiss(toastId)
     }
   }
 
-  // === Publish Timetable ===
-  const handlePublishTimetable = async (data) => {
-  try {
-    const toastId = toast.loading('Publishing timetable...')
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const coordinatorId = user.id || user._id
-
-    if (!coordinatorId) {
-      toast.dismiss(toastId)
-      return toast.error('Login required.')
+  const handlePublishTimetable = async () => {
+    const id = savedTimetableId || timetableData?._id || timetableData?.id
+    if (!id) return toast.error('No timetable to publish')
+    let toastId
+    try {
+      toastId = toast.loading('Publishing timetable...')
+      const response = await timetableAPI.publishTimetable(id, { isPublished: true })
+      const updated = unwrapResponse(response)
+      if (updated) {
+        setTimetableData(updated)
+        setIsPublished(Boolean(updated.isPublished))
+        toast.success('Timetable published')
+      }
+    } catch (err) {
+      console.error('Publish timetable error:', err)
+      toast.error('Failed to publish timetable')
+    } finally {
+      if (toastId) toast.dismiss(toastId)
     }
-
-    // ✅ Construct full name safely
-    const coordinatorName = (() => {
-      const salutation = user.salutation ? `${user.salutation}.` : "Mr."
-      const first = user.firstName?.trim() || ""
-      const last = user.lastName?.trim() || ""
-      const username = user.username || ""
-      const combined = [salutation, first, last].filter(Boolean).join(" ").trim()
-      return combined || `Mr. ${username}`
-    })()
-
-    // ✅ Clean schedule before sending
-    const sanitized = sanitizeSchedule(data.schedule)
-
-    // ✅ Final payload to send to backend
-    const fullPayload = {
-      year: data.year || selectedClass?.year,
-      branch: (data.branch || selectedClass?.branch || '').toLowerCase(),
-      section: data.section || selectedClass?.section,
-      semester: data.semester || selectedClass?.semester,
-      academicYear: data.academicYear || selectedClass?.academicYear,
-      schedule: sanitized,
-      isPublished: true,
-      coordinatorName // ✅ Send full name here
-    }
-
-    const id = timetableData?._id || timetableData?.id
-    const response = await timetableAPI.publishTimetable(id, fullPayload)
-
-    const published = unwrapResponse(response)
-    if (!published) throw new Error('Invalid publish response')
-
-    setTimetableData(published)
-    setSavedTimetableId(published._id || published.id)
-    setIsPublished(true)
-
-    toast.dismiss(toastId)
-    toast.success('Timetable published successfully!')
-    setCurrentStep('grid')
-
-    return published
-  } catch (err) {
-    console.error('Publish error:', err)
-    toast.error('Failed to publish timetable: ' + (err.response?.data?.message || err.message))
-    throw err
   }
-}
 
-
-  // === Render Views ===
-  if (currentStep === 'selector')
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
+  return (
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+    {currentStep === 'selector' && (
+      <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center mb-4">
             <Calendar className="w-8 h-8 text-purple-500 mr-3" />
@@ -286,14 +290,42 @@ const fetchExistingTimetable = async (classData) => {
 
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-6">Select Class Details</h2>
-          <TimetableSelector onSelect={handleClassSelection} />
+          <TimetableSelector 
+            onSelect={handleClassSelection} 
+            renderActionButton={(selectedData) => (
+              selectedData && selectedData.year && selectedData.branch && selectedData.section && selectedData.semester && selectedData.academicYear ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClass(selectedData)
+                    handleOpenGenerator()
+                  }}
+                  className="mt-6 flex items-center justify-center w-full py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors"
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Generate Sample Timetable
+                </button>
+              ) : null
+            )}
+          />
         </div>
-      </motion.div>
-    )
 
-  if (currentStep === 'grid')
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+        {showGenerator && selectedClass && (
+          <SampleTimetableConfigForm
+            branch={selectedClass.branch}
+            year={selectedClass.year}
+            semester={selectedClass.semester}
+            sections={selectedClass.section ? [selectedClass.section] : []}
+            academicYear={selectedClass.academicYear}
+            onClose={handleCloseGenerator}
+            onGenerationComplete={handleGenerationComplete}
+          />
+        )}
+      </div>
+    )}
+
+    {currentStep === 'grid' && (
+      <div className="w-full">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <button onClick={handleBackToSelector} className="mr-4 p-2 rounded-lg hover:bg-gray-200">
@@ -325,12 +357,11 @@ const fetchExistingTimetable = async (classData) => {
           savedTimetableId={savedTimetableId}
           isPublished={isPublished}
         />
-      </motion.div>
-    )
+      </div>
+    )}
 
-  if (currentStep === 'edit')
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+    {currentStep === 'edit' && (
+      <div className="w-full">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <button onClick={handleBackToGrid} className="mr-4 p-2 rounded-lg hover:bg-gray-200">
@@ -357,10 +388,10 @@ const fetchExistingTimetable = async (classData) => {
           savedTimetableId={savedTimetableId}
           isPublished={isPublished}
         />
-      </motion.div>
-    )
-
-  return null
+      </div>
+    )}
+  </motion.div>
+  )
 }
 
-export default CoordinatorTimetable
+export default CoordinatorTimetable;

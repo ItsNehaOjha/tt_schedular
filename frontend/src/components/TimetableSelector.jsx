@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 
-const TimetableSelector = ({ onSelect }) => {
+const TimetableSelector = ({ onSelect, renderActionButton }) => {
   const [formData, setFormData] = useState({
     year: '',
     branch: '',
@@ -144,6 +144,9 @@ const TimetableSelector = ({ onSelect }) => {
       >
         Create/View Timetable
       </motion.button>
+      
+      {/* Render custom action button if provided */}
+      {renderActionButton && renderActionButton(formData)}
     </form>
   )
 }
