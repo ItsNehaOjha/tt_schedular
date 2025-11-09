@@ -106,7 +106,7 @@ export const timetableAPI = {
   getTimetableByBranchSection: (branch, section, year) => api.get(`/timetable/${branch}/${section}`, { params: { year } }),
   getTimetableByClass: (params) => api.get('/timetable/class', { params }),
   getTeacherTimetable: (id) => api.get(`/timetable/teacher/${id}`),
-  getTimetables: () => api.get('/timetable'),
+  getTimetables: (params = {}) => api.get('/timetable', { params }),
   createTimetable: (data) => api.post('/timetable', data),
   updateTimetable: (id, data) => api.put(`/timetable/${id}`, data),
   publishTimetable: (id, data) => api.put(`/timetable/${id}/publish`, data),

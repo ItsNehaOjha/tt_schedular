@@ -77,13 +77,78 @@ const fetchExistingTimetable = async (classData) => {
     setShowGenerator(false)
   }
 
-  const handleGenerationComplete = (draftId) => {
-    setGeneratedDraftId(draftId)
+  const handleGenerationComplete = async (result) => {
+    const draftId = typeof result === 'string' ? result : result?.id || result?._id || result?.draftId || null
+    const existing = result && typeof result === 'object' && result.existing ? result.existing : null
+    setGeneratedDraftId(draftId || null)
     setShowGenerator(false)
-    
-    // Fetch the generated draft timetable
-    if (selectedClass && draftId) {
-      fetchDraftTimetable(draftId)
+
+    try {
+      // If an existing timetable was found in preflight, open it directly
+      if (existing) {
+        setTimetableData(existing)
+        setSavedTimetableId(existing._id || existing.id)
+        setIsPublished(Boolean(existing.isPublished))
+        setCurrentStep('edit')
+        toast.success('Existing timetable opened')
+        return
+      }
+
+      if (selectedClass && draftId) {
+        // Open specific draft if id returned
+        await fetchDraftTimetable(draftId)
+        return
+      }
+
+      if (selectedClass) {
+        // Fallback: try viewing the class timetable (respects academic year)
+        setLoading(true)
+        try {
+          const resp = await timetableAPI.viewTimetable({
+            year: selectedClass.year,
+            branch: (selectedClass.branch || '').toUpperCase(),
+            section: (selectedClass.section || '').toUpperCase(),
+            semester: selectedClass.semester,
+            academicYear: selectedClass.academicYear
+          })
+          const data = unwrapResponse(resp)
+          if (data) {
+            setTimetableData(data)
+            setSavedTimetableId(data._id || data.id)
+            setIsPublished(Boolean(data.isPublished))
+            setCurrentStep('edit')
+            toast.success('Draft timetable loaded')
+            return
+          }
+        } catch {}
+
+        // Try fetching latest draft explicitly (now filtered by semester and academicYear)
+        const listResp = await timetableAPI.getTimetables({
+          year: selectedClass.year,
+          branch: (selectedClass.branch || '').toUpperCase(),
+          section: (selectedClass.section || '').toUpperCase(),
+          isPublished: false,
+          semester: selectedClass.semester,
+          academicYear: selectedClass.academicYear,
+          limit: 1
+        })
+        const listData = listResp?.data?.data
+        if (Array.isArray(listData) && listData.length) {
+          const draft = listData[0]
+          setTimetableData(draft)
+          setSavedTimetableId(draft._id || draft.id)
+          setIsPublished(Boolean(draft.isPublished))
+          setCurrentStep('edit')
+          toast.success('Draft timetable loaded')
+        } else {
+          toast.error('Generated timetable not found')
+        }
+      }
+    } catch (err) {
+      console.error('Open generated timetable error:', err)
+      toast.error(err?.response?.data?.message || 'Failed to open generated timetable')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -255,13 +320,31 @@ const fetchExistingTimetable = async (classData) => {
     }
   }
 
-  const handlePublishTimetable = async () => {
+  const handlePublishTimetable = async (data) => {
     const id = savedTimetableId || timetableData?._id || timetableData?.id
     if (!id) return toast.error('No timetable to publish')
     let toastId
     try {
       toastId = toast.loading('Publishing timetable...')
-      const response = await timetableAPI.publishTimetable(id, { isPublished: true })
+      const payload = {
+        year: data?.year || selectedClass?.year || timetableData?.year,
+        branch: (data?.branch || selectedClass?.branch || timetableData?.branch || '').toUpperCase(),
+        section: (data?.section || selectedClass?.section || timetableData?.section || '').toUpperCase(),
+        semester: data?.semester || selectedClass?.semester || timetableData?.semester,
+        academicYear: data?.academicYear || selectedClass?.academicYear || timetableData?.academicYear,
+        schedule: data?.schedule || timetableData?.schedule || [],
+        isPublished: true,
+        coordinatorName: data?.coordinatorName
+      }
+
+      if (!payload.year || !payload.branch || !payload.section || !payload.semester || !payload.academicYear) {
+        toast.dismiss(toastId)
+        return toast.error('Missing class identifiers for publish (year, branch, section, semester, academicYear)')
+      }
+
+      console.log('Publish payload:', payload)
+
+      const response = await timetableAPI.publishTimetable(id, payload)
       const updated = unwrapResponse(response)
       if (updated) {
         setTimetableData(updated)
@@ -270,7 +353,8 @@ const fetchExistingTimetable = async (classData) => {
       }
     } catch (err) {
       console.error('Publish timetable error:', err)
-      toast.error('Failed to publish timetable')
+      if (err?.response?.data) console.error('Publish error response:', err.response.data)
+      toast.error(err?.response?.data?.message || 'Failed to publish timetable')
     } finally {
       if (toastId) toast.dismiss(toastId)
     }

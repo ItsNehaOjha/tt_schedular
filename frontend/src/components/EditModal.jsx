@@ -26,18 +26,23 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
   // add-teacher panel
   const [showAddTeacher, setShowAddTeacher] = useState(false)
   const [customTeacher, setCustomTeacher] = useState({ name: '', department: '' })
+  const [showAddSubject, setShowAddSubject] = useState(false)
+  const [subjectLoading, setSubjectLoading] = useState(false)
+  const [customSubject, setCustomSubject] = useState({ name: '', code: '', acronym: '', type: 'theory', credits: 3 })
 
   const getBranch = () => data?.branch || timetableData?.branch || 'CSE'
   const getYear = () => {
     const yearMap = { '1st Year': 1, '2nd Year': 2, '3rd Year': 3, '4th Year': 4 }
     return yearMap[data?.year || timetableData?.year] || 1
   }
-  const getSemester = () => parseInt(data?.semester || timetableData?.semester || 1)
+  const getSemesterGlobal = () => parseInt(data?.semester || timetableData?.semester || 1)
+  // Use GLOBAL semester everywhere (backend is backward-compatible for legacy data)
+  const getSemester = () => getSemesterGlobal()
 
-  // Fetch lists
+  // Fetch lists (filter by branch + semester [+ year])
   const { data: subjectsData, refetch: refetchSubjects } = useQuery({
-    queryKey: ['subjects', getBranch(), getYear()],
-    queryFn: async () => (await subjectAPI.getSubjects({ branch: getBranch(), year: getYear() })).data,
+    queryKey: ['subjects', getBranch(), getSemesterGlobal(), getYear()],
+    queryFn: async () => (await subjectAPI.getSubjects({ branch: getBranch(), semester: getSemesterGlobal(), year: getYear() })).data,
     enabled: isOpen
   })
 
@@ -140,6 +145,40 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
     setLoading(false);
   }
 };
+
+
+  const handleCreateSubject = async () => {
+    try {
+      const name = (customSubject.name || '').trim()
+      const code = (customSubject.code || '').trim()
+      if (!name || !code) return toast.error('Enter subject name and code')
+      const payload = {
+        name,
+        code,
+        acronym: (customSubject.acronym || code).trim(),
+        branches: [String(getBranch()).toUpperCase()],
+        type: customSubject.type === 'lab' ? 'lab' : 'theory',
+        year: getYear(),
+        semester: getSemesterGlobal(),
+        creditHours: Number(customSubject.credits) || 3
+      }
+      setSubjectLoading(true)
+      const res = await subjectAPI.createSubject(payload)
+      const created = res?.data?.data
+      if (created?._id) {
+        await refetchSubjects()
+        if (!isParallelLab) setFormData(prev => ({ ...prev, subject: created._id }))
+        toast.success('✅ Subject created')
+        setShowAddSubject(false)
+        setCustomSubject({ name: '', code: '', acronym: '', type: 'theory', credits: 3 })
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error(err?.response?.data?.message || 'Error creating subject')
+    } finally {
+      setSubjectLoading(false)
+    }
+  }
 
 
   // Submit
@@ -260,6 +299,66 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
                 </option>
               ))}
             </select>
+          )}
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowAddSubject(s => !s)}
+              className="inline-flex items-center text-sm text-purple-700 hover:text-purple-800"
+            >
+              + Add New Subject
+            </button>
+          </div>
+
+          {showAddSubject && (
+            <div className="bg-purple-50 p-3 rounded-lg grid grid-cols-1 gap-2">
+              <input
+                placeholder="Subject Name"
+                value={customSubject.name}
+                onChange={(e) => setCustomSubject({ ...customSubject, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  placeholder="Code (e.g., KCS501)"
+                  value={customSubject.code}
+                  onChange={(e) => setCustomSubject({ ...customSubject, code: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+                <input
+                  placeholder="Acronym (optional)"
+                  value={customSubject.acronym}
+                  onChange={(e) => setCustomSubject({ ...customSubject, acronym: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={customSubject.type}
+                  onChange={(e) => setCustomSubject({ ...customSubject, type: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="theory">Theory</option>
+                  <option value="lab">Lab</option>
+                </select>
+                <input
+                  type="number"
+                  placeholder="Credits"
+                  value={customSubject.credits}
+                  onChange={(e) => setCustomSubject({ ...customSubject, credits: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateSubject}
+                disabled={subjectLoading}
+                className="bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700"
+              >
+                {subjectLoading ? 'Creating…' : 'Create Subject'}
+              </button>
+            </div>
           )}
 
           {/* Split Lab (subjects + teachers for B1/B2) */}

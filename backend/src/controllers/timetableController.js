@@ -11,7 +11,7 @@ import crypto from 'crypto';
 // Helper function to check if a teacher is busy at a specific day and time slot
 const isTeacherBusy = async (teacherId, day, timeSlot, options = {}, excludeSection = null) => {
   if (!teacherId) return false;
-  const { treatDraftsAsBusy = true } = options || {};
+  const { treatDraftsAsBusy = true, busyAcademicYear, busySemester } = options || {};
 
   const baseMatch = {
     'schedule.day': day,
@@ -23,6 +23,9 @@ const isTeacherBusy = async (teacherId, day, timeSlot, options = {}, excludeSect
       { 'schedule.teacher.username': teacherId }
     ]
   };
+
+  if (busyAcademicYear) baseMatch.academicYear = busyAcademicYear;
+  if (busySemester) baseMatch.semester = busySemester;
 
   if (excludeSection) baseMatch.section = { $ne: excludeSection };
 
@@ -156,6 +159,19 @@ if (!sectionsToGenerate.length) {
       warnings.push(`No subjects provided for section ${section}; skipping generation for this section.`);
       continue;
     }
+    // Prevent replacing an existing timetable for this class when overwrite is false
+    const existing = await Timetable.findOne({
+      year,
+      branch: branch.toUpperCase(),
+      section: section.toUpperCase()
+    }).lean();
+    if (existing && !options.overwriteExisting) {
+      return res.status(409).json({
+        success: false,
+        message: `Timetable already exists for ${year} ${branch.toUpperCase()}-${section.toUpperCase()} (${academicYear}).`
+      });
+    }
+
     // Create empty schedule structure
     const schedule = {};
     weekDays.forEach(day => {
@@ -165,14 +181,10 @@ if (!sectionsToGenerate.length) {
       });
     });
 
-    // Reserve lunch slot across all days
+    // Reserve lunch slot across ALL days at the configured slot index
     if (typeof lunch?.slotIndex === 'number' && lunch.slotIndex >= 0 && lunch.slotIndex < timeSlots.length) {
       const lunchSlot = timeSlots[lunch.slotIndex];
-      weekDays.forEach((day, idx) => {
-        // If dayIndex is specified, optionally enforce only that day; else fill all days
-        if (typeof lunch?.dayIndex === 'number' && lunch.dayIndex >= 0) {
-          if (idx !== lunch.dayIndex) return;
-        }
+      weekDays.forEach((day) => {
         schedule[day][lunchSlot] = {
           subject: lunch.label || 'LUNCH',
           type: 'lunch',
@@ -252,7 +264,13 @@ if (!sectionsToGenerate.length) {
         }
         
         // Check if teacher is busy in existing timetables
-        const isBusy = await isTeacherBusy(teacherId, day, slot, { treatDraftsAsBusy: options.treatDraftsAsBusy }, section);
+        const isBusy = await isTeacherBusy(
+          teacherId,
+          day,
+          slot,
+          { treatDraftsAsBusy: options.treatDraftsAsBusy, busyAcademicYear: academicYear, busySemester: semester },
+          section
+        );
         if (isBusy) {
           warnings.push(`Teacher for ${subject.name} is busy in an existing timetable at ${day} ${slot}`);
           return false;
@@ -264,7 +282,7 @@ if (!sectionsToGenerate.length) {
         subject: subject.name,
         code: subject.subjectId,
         type: subject.isLab ? 'lab' : 'lecture',
-        teacher: teacherId ? { id: teacherId, name: subject.teacherName || '' } : '',
+        teacher: teacherId ? { id: teacherId, name: subject.teacherName || '', username: subject.teacherUsername || '' } : '',
         room: '',
         isLabSession: subject.isLab,
         requiresMultipleSlots: subject.requires2Slots
@@ -425,7 +443,10 @@ if (!sectionsToGenerate.length) {
         timetableDraft.metadata = {
           ...(timetableDraft.metadata || {}),
           generatedAt: new Date(),
-          generator: 'generateSampleTimetable'
+          generator: 'generateSampleTimetable',
+          weekDays,
+          timeSlots,
+          slotConfig
         };
         await timetableDraft.save();
       }
@@ -437,7 +458,7 @@ if (!sectionsToGenerate.length) {
         isPublished: false,
         isDraft: true,
         generatedBy: 'generator',
-        metadata: { generatedAt: new Date(), generator: 'generateSampleTimetable' }
+        metadata: { generatedAt: new Date(), generator: 'generateSampleTimetable', weekDays, timeSlots, slotConfig }
       });
     }
   }
@@ -457,8 +478,12 @@ export const getDraftTimetable = asyncHandler(async (req, res) => {
   const draft = await Timetable.findById(id).lean();
   if (!draft) return res.status(404).json({ success: false, message: 'Draft not found' });
 
-  const days = [...new Set((draft.schedule || []).map(s => s.day))].filter(Boolean);
-  const timeSlots = [...new Set((draft.schedule || []).map(s => s.timeSlot))].filter(Boolean);
+  const days = (draft.metadata && Array.isArray(draft.metadata.weekDays) && draft.metadata.weekDays.length)
+    ? draft.metadata.weekDays
+    : [...new Set((draft.schedule || []).map(s => s.day))].filter(Boolean);
+  const timeSlots = (draft.metadata && Array.isArray(draft.metadata.timeSlots) && draft.metadata.timeSlots.length)
+    ? draft.metadata.timeSlots
+    : [...new Set((draft.schedule || []).map(s => s.timeSlot))].filter(Boolean);
   return res.json({ success: true, data: { ...draft, days, timeSlots } });
 });
 
@@ -468,13 +493,16 @@ export const getDraftTimetable = asyncHandler(async (req, res) => {
    Access: Private (Coordinator)
 ============================================================ */
 export const getTimetables = asyncHandler(async (req, res, next) => {
-  const { page = 1, limit = 10, year, branch, section, isPublished } = req.query
+  const { page = 1, limit = 10, year, branch, section, isPublished, semester, academicYear, isDraft } = req.query
 
   const query = {}
   if (year) query.year = year
   if (branch) query.branch = branch
   if (section) query.section = section
   if (isPublished !== undefined) query.isPublished = isPublished === 'true'
+  if (typeof isDraft !== 'undefined') query.isDraft = String(isDraft) === 'true'
+  if (semester) query.semester = Number(semester)
+  if (academicYear) query.academicYear = academicYear
 
   const sortOrder = { isPublished: -1, updatedAt: -1, createdAt: -1 }
 

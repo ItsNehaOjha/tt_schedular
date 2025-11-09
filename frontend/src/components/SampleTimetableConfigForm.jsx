@@ -19,6 +19,7 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
   const [lunchStartTime, setLunchStartTime] = useState('12:10')
 
   const [perSectionRows, setPerSectionRows] = useState({}) // { A: [ { name, subjectId, teacherId, weekly, isLab, requires2Slots, canSplitBatch } ] }
+  const [ay, setAy] = useState(academicYear || '')
   const [applyAllSections, setApplyAllSections] = useState(true)
   const effectiveSections = useMemo(() => (applyAllSections && (!sections || sections.length === 0)) ? ['A','B','C'] : (sections.length ? sections : ['A']), [applyAllSections, sections])
 
@@ -30,13 +31,16 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
         const tRes = await teacherAPI.getAllTeachers()
         const tData = tRes?.data?.data || tRes?.data || []
         setTeachers(Array.isArray(tData) ? tData : [])
-        // Load subjects filtered by year+branch+semester
-        let sRes = await subjectAPI.getSubjects({ branch, semester, year })
+        // Load subjects filtered by branch + year + GLOBAL semester (1..8)
+        const yearMap = { '1st Year': 1, '2nd Year': 2, '3rd Year': 3, '4th Year': 4 }
+        const yearNum = typeof year === 'string' ? (yearMap[year] || parseInt(year) || undefined) : year
+        const semGlobal = parseInt(semester)
+        let sRes = await subjectAPI.getSubjects({ branch, semester: semGlobal, year: yearNum })
         let sData = sRes?.data?.data
         setSubjects(Array.isArray(sData) ? sData : [])
-        // Initialize rows per section from subjects
+        // Initialize rows per section from subjects (use full name; code derived)
         const baseRows = (Array.isArray(sData) ? sData : []).map(s => ({
-          name: s.acronym || s.name,
+          name: s.name,
           subjectId: s.code || s._id,
           teacherId: '',
           weekly: s.type === 'lab' ? 2 : 6,
@@ -101,17 +105,27 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
     const perSectionSubjects = {}
     const sectionKeys = Object.keys(perSectionRows || {})
     sectionKeys.forEach(sec => {
-      const rows = (perSectionRows[sec] || []).filter(r => r.name && (r.weekly||0) > 0)
+      const rows = (perSectionRows[sec] || [])
+        .filter(r => r.name && (r.weekly||0) > 0)
+        .map(r => {
+          const t = (teachers || []).find(t0 => (t0._id || t0.id || t0.teacherId) === r.teacherId)
+          return {
+            ...r,
+            teacherName: t ? (t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim()) : '',
+            teacherUsername: t ? (t.username || t.userName || '') : ''
+          }
+        })
       perSectionSubjects[sec] = rows
     })
 
-    const sectionsForPayload = applyAllSections ? [] : (sectionKeys.length ? sectionKeys : effectiveSections)
+    // Always send explicit sections to avoid backend defaulting to A/B/C when empty
+    const sectionsForPayload = sectionKeys.length ? sectionKeys : effectiveSections
 
     return {
       branch,
       year,
       semester,
-      academicYear,
+      academicYear: ay || academicYear,
       sections: sectionsForPayload,
       weekDays,
       slotConfig,
@@ -121,12 +135,43 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
     }
   }
 
+  const subjectOptions = useMemo(() => (subjects || []).map(s => ({
+    value: s.code || s._id,
+    label: `${s.name} (${s.code})`,
+    meta: s
+  })), [subjects])
+
   const handleGenerate = async () => {
     try {
       // basic validation
       const hasAny = Object.values(perSectionRows || {}).some(list => (list || []).length > 0)
       if (!hasAny) return toast.error('No subjects available for generation. Please configure first.')
       if (!branch || !semester || !year || !academicYear) return toast.error('Branch, Year, Semester, and Academic Year are required!')
+      // Preflight: block if timetable already exists for any target section
+      const targets = (applyAllSections && (!sections || sections.length === 0)) ? effectiveSections : (sections.length ? sections : effectiveSections)
+      try {
+        // Use list endpoint to detect an exact timetable (published or draft) for this class+semester+academicYear
+        const existingPerSection = await Promise.all(targets.map(async (sec) => {
+          const resp = await timetableAPI.getTimetables({
+            year,
+            branch: (branch||'').toUpperCase(),
+            section: (sec||'').toUpperCase(),
+            semester,
+            academicYear: ay || academicYear,
+            limit: 1
+          })
+          const list = resp?.data?.data || resp?.data || []
+          return list?.[0] || null
+        }))
+        const foundIdx = existingPerSection.findIndex(Boolean)
+        if (foundIdx !== -1) {
+          const existing = existingPerSection[foundIdx]
+          toast.success('Opening existing timetable for editing')
+          onGenerationComplete && onGenerationComplete({ existing })
+          onClose && onClose()
+          return
+        }
+      } catch {}
       // ensure all rows with weekly>0 have a teacher assigned
       const missingTeacher = Object.values(perSectionRows || {}).some(list => (list||[]).some(r => (r.weekly||0) > 0 && !r.teacherId))
       if (missingTeacher) return toast.error('Assign all teachers before generating.')
@@ -141,19 +186,20 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
       console.log('Submitting Generate Payload:', payload)
       const res = await timetableAPI.generateSample(payload)
       console.log('Timetable Generator Response:', res?.data)
-      if (res?.data?.status === 'ok') {
-        const first = Object.values(res.data.generated || {})[0]
-        if (first?.draftId) {
-          toast.success('Draft generated')
-          onGenerationComplete && onGenerationComplete(first.draftId)
-          onClose && onClose()
-          return
-        }
+      if (res?.data?.success) {
+        toast.success(res?.data?.message || 'Draft generated')
+        onGenerationComplete && onGenerationComplete(null)
+        onClose && onClose()
+        return
       }
-      toast.error('Failed to generate timetable')
+      toast.error(res?.data?.message || 'Failed to generate timetable')
     } catch (e) {
       console.error(e)
-      toast.error(e?.response?.data?.message || 'Generation failed')
+      if (e?.response?.status === 409) {
+        toast.error('A timetable already exists for this class and year — open it instead of generating a new one.')
+      } else {
+        toast.error(e?.response?.data?.message || 'Generation failed')
+      }
     } finally {
       setSaving(false)
     }
@@ -211,6 +257,9 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
               <label className="text-sm">Lunch Start Time
                 <input value={lunchStartTime} onChange={e=>setLunchStartTime(e.target.value)} className="mt-1 w-full border rounded px-2 py-1"/>
               </label>
+              <label className="text-sm">Academic Year
+                <input placeholder="2025-2026" value={ay} onChange={e=>setAy(e.target.value)} className="mt-1 w-full border rounded px-2 py-1"/>
+              </label>
               <label className="text-sm flex items-center gap-2 mt-6">
                 <input type="checkbox" checked={applyAllSections} onChange={()=>setApplyAllSections(v=>!v)} />
                 Generate for all sections
@@ -245,11 +294,26 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
                   <tbody>
                     {(perSectionRows[sec]||[]).map((row, idx) => (
                       <tr key={idx} className="border-b">
-                        <td className="py-2 pr-4">
-                          <input value={row.name} onChange={e=>handleRowChange(sec, idx, 'name', e.target.value)} className="w-40 border rounded px-2 py-1"/>
+                        <td className="py-2 pr-4 min-w-[260px]">
+                          <Select
+                            classNamePrefix="react-select"
+                            isSearchable
+                            placeholder="Select Subject"
+                            options={subjectOptions}
+                            value={subjectOptions.find(o => o.value === row.subjectId) || null}
+                            onChange={(opt) => {
+                              if (opt) {
+                                handleRowChange(sec, idx, 'name', opt.meta?.name || opt.meta?.acronym || opt.label)
+                                handleRowChange(sec, idx, 'subjectId', opt.value)
+                              } else {
+                                handleRowChange(sec, idx, 'name', '')
+                                handleRowChange(sec, idx, 'subjectId', '')
+                              }
+                            }}
+                          />
                         </td>
                         <td className="py-2 pr-4">
-                          <input value={row.subjectId} onChange={e=>handleRowChange(sec, idx, 'subjectId', e.target.value)} className="w-32 border rounded px-2 py-1"/>
+                          <input value={row.subjectId} readOnly className="w-32 border rounded px-2 py-1 bg-gray-100 text-gray-600"/>
                         </td>
                         <td className="py-2 pr-4 min-w-[220px]">
                           <Select

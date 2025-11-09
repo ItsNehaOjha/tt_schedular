@@ -652,7 +652,8 @@ if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
           if (cellData && (cellData.subject || cellData.teacher)) {
             if (!isSpecialEntry(cellData.subject, cellData.type)) {
               if (!cellData.subject) errors.push(`Missing subject for ${day} ${slot}`)
-              if (!cellData.teacher) errors.push(`Missing teacher for ${day} ${slot}`)
+              // Note: Teacher selection is optional during save to allow drafts/sample timetables.
+              // Publishing can enforce stricter checks if needed.
             }
           }
         })

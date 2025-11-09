@@ -10,11 +10,41 @@ import { predefinedSubjects } from '../utils/predefinedSubjects.js'
 export const getSubjects = asyncHandler(async (req, res, next) => {
   const { branch, isActive, year, semester } = req.query
   
-  let filter = {}
+  const filter = {}
   if (branch) filter.branches = branch
   filter.isActive = true // ensure only active subjects appear
-  if (year) filter.year = parseInt(year)
-  if (semester) filter.semester = parseInt(semester)
+
+  const parsedYear = year ? parseInt(year) : undefined
+  const parsedSem = semester ? parseInt(semester) : undefined
+
+  if (parsedYear) filter.year = parsedYear
+
+  // Back-compat: support queries where semester may be a global number (3..8) or in-year (1..2)
+  if (parsedSem) {
+    // If semester is given as global and year known, map to in-year and include both
+    if (parsedSem > 2 && parsedYear) {
+      const inYearSem = parsedSem - (parsedYear - 1) * 2
+      // Guard in-year range 1..2
+      const normalized = inYearSem >= 1 && inYearSem <= 2 ? inYearSem : parsedSem
+      filter.$or = [{ semester: parsedSem }, { semester: normalized }]
+    } else if (parsedSem > 2 && !parsedYear) {
+      // If year not provided, infer likely year from global semester
+      const inferredYear = Math.ceil(parsedSem / 2)
+      const inYearSem = ((parsedSem - 1) % 2) + 1 // 1 for odd, 2 for even
+      // Match either records saved as global or in-year with inferred year
+      filter.$or = [
+        { semester: parsedSem },
+        { $and: [{ year: inferredYear }, { semester: inYearSem }] }
+      ]
+    } else if (parsedSem <= 2 && parsedYear) {
+      // In-year semester provided with year: include OR with equivalent global semester
+      const globalSem = (parsedYear - 1) * 2 + parsedSem
+      filter.$or = [{ semester: parsedSem }, { semester: globalSem }]
+    } else {
+      // Regular case
+      filter.semester = parsedSem
+    }
+  }
 
   const subjects = await Subject.find(filter)
     .populate('createdBy', 'username firstName lastName')

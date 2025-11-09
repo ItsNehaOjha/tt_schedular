@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+
 import { motion } from 'framer-motion'
 
 const TimetableSelector = ({ onSelect, renderActionButton }) => {
@@ -11,20 +12,40 @@ const TimetableSelector = ({ onSelect, renderActionButton }) => {
   })
 
   const years = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+  const yearToSemesters = {
+    '1st Year': [1, 2],
+    '2nd Year': [3, 4],
+    '3rd Year': [5, 6],
+    '4th Year': [7, 8]
+  }
+
   const branches = [
-     { value: 'CSE', label: 'Computer Science & Engineering' },
-  { value: 'CS', label: 'Computer Science' },
-  { value: 'Biotechnology', label: 'Biotechnology' },
-  { value: 'CE', label: 'Civil Engineering' },
-  { value: 'IT', label: 'Information Technology' },
-  { value: 'EC', label: 'Electronics & Communication' },
-  { value: 'EE', label: 'Electrical Engineering' },
-  { value: 'ME', label: 'Mechanical Engineering' },
-  { value: 'MBA', label: 'MBA' },
-  { value: 'MCA', label: 'MCA' }
+    { value: 'CSE', label: 'Computer Science & Engineering' },
+    { value: 'CS', label: 'Computer Science' },
+    { value: 'Biotechnology', label: 'Biotechnology' },
+    { value: 'CE', label: 'Civil Engineering' },
+    { value: 'IT', label: 'Information Technology' },
+    { value: 'EC', label: 'Electronics & Communication' },
+    { value: 'EE', label: 'Electrical Engineering' },
+    { value: 'ME', label: 'Mechanical Engineering' },
+    { value: 'MBA', label: 'MBA' },
+    { value: 'MCA', label: 'MCA' }
   ]
   const sections = ['A', 'B', 'C', 'D']
-  const semesters = ['1', '2', '3', '4', '5', '6', '7', '8']
+  const semestersAll = ['1', '2', '3', '4', '5', '6', '7', '8']
+
+  const allowedSemesters = useMemo(() => {
+    const allowed = yearToSemesters[formData.year]
+    return allowed ? allowed.map(String) : semestersAll
+  }, [formData.year])
+
+  // Auto-correct semester when year changes to ensure valid combo
+  useEffect(() => {
+    if (!formData.year) return
+    if (!allowedSemesters.includes(formData.semester)) {
+      setFormData(prev => ({ ...prev, semester: allowedSemesters[0] || '' }))
+    }
+  }, [formData.year, allowedSemesters])
 
   const handleChange = (e) => {
     setFormData({
@@ -110,7 +131,7 @@ const TimetableSelector = ({ onSelect, renderActionButton }) => {
           required
         >
           <option value="">Select Semester</option>
-          {semesters.map(semester => (
+          {allowedSemesters.map(semester => (
             <option key={semester} value={semester}>Semester {semester}</option>
           ))}
         </select>
