@@ -615,150 +615,114 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
    Access: Public or Protected
 ============================================================ */
 
-export const getBusyTeachersForSlot = async (req, res) => {
-  try {
-    const { day, slotKey, timeSlot, branch, year, section } = req.query;
-    if (!day || (!slotKey && !timeSlot)) {
-      return res.status(400).json({ success: false, message: 'day and slotKey|timeSlot required' });
-    }
-    const slot = slotKey || timeSlot;
-
-    const match = { 'schedule.day': day, 'schedule.timeSlot': slot };
-    if (branch) match.branch = branch;
-    if (year) match.year = year;
-    if (section) match.section = section;
-
-   // --- PATCH START ---
-// aggregate teachers busy in this day+slot with class context
-const agg = [
-  { $match: match },
-  { $unwind: "$schedule" },
-  {
-    $match: {
-      "schedule.day": day,
-      "schedule.timeSlot": slot
-    }
-  },
-  {
-    $project: {
-      teacherId_field: { $ifNull: ["$schedule.teacher._id", "$schedule.teacher.id"] },
-      teacherAltId: "$schedule.teacherId",
-      teacherUsername: "$schedule.teacher.username",
-      teacherName: "$schedule.teacher.name",
-      year: 1,
-      branch: 1,
-      section: 1,
-      subject: {
-        $ifNull: [
-          "$schedule.subject.acronym",
-          "$schedule.subject.name"
-        ]
-      },
-      type: "$schedule.type",
-      timeSlot: "$schedule.timeSlot"
-    }
-  },
-  {
-    $addFields: {
-      teacherCandidate: {
-        $ifNull: [
-          "$teacherId_field",
-          { $ifNull: ["$teacherAltId", "$teacherUsername"] }
-        ]
-      },
-      classLabel: {
-        $concat: [
-          { $ifNull: ["$year", ""] },
-          " ",
-          { $ifNull: ["$branch", ""] },
-          "-",
-          { $ifNull: ["$section", ""] }
-        ]
-      },
-     classDetail: {
-  $concat: [
-    { $ifNull: ["$subject", "Class"] },
-    " • ",
-    {
-      $cond: [
-        { $eq: ["$type", "Split Lab (B1/B2)"] },
-        "Split Lab (B1/B2)",
-        { $ifNull: ["$type", "Lecture"] }
-      ]
-    },
-    " • ",
-    { $ifNull: ["$timeSlot", ""] }
-  ]
-}
-
-    }
-  },
-  {
-    $group: {
-      _id: "$teacherCandidate",
-      name: { $first: "$teacherName" },
-      username: { $first: "$teacherUsername" },
-      teacherAltId: { $first: "$teacherAltId" },
-      classLabel: { $first: "$classLabel" },
-      classDetail: { $first: "$classDetail" }
-    }
-  },
-  {
-  $project: {
-    _id: 0,
-    id: { $toString: "$_id" },
-    name: 1,
-    username: 1,
-    teacherId: "$teacherAltId",
-    busy: { $literal: true },
-
-    // ✅ Fix 1: Compute and return classInfo directly
-    classInfo: {
-  $trim: {
-    input: {
-      $concat: [
-        { $ifNull: ["$classLabel", ""] },
-        {
-          $cond: [
-            { $and: [{ $ne: ["$classDetail", null] }, { $ne: ["$classDetail", ""] }] },
-            { $concat: [" (", "$classDetail", ")"] },
-            ""
-          ]
-        }
-      ]
-    }
-  }
-},
-
-
-    // ✅ Fix 2: Keep fields separate too (debug-friendly)
-    classLabel: 1,
-    classDetail: 1
-  }
-}
-
+export const getBusyTeachersForSlot = asyncHandler(async (req, res) => {
+  const { day } = req.query;
+  const rawTime = req.query.timeSlot || req.query.slotKey || '';
+  const {
+    excludeBranch,
+    excludeYear,
+    excludeSection,
+    excludeAcademicYear,
+    excludeSemester
+  } = req.query;
   
-];
-
-const busyTeachers = await Timetable.aggregate(agg).allowDiskUse(true);
-// --- PATCH END ---
-
-
-    // For backward compatibility: list of string ids
-    const rawList = busyTeachers.map(t => String(t.id)).filter(Boolean);
-    const usernames = busyTeachers.map(t => t.username).filter(Boolean);
-
-    return res.json({
-      success: true,
-      busyTeachers: rawList,
-      busyTeacherUsernames: usernames,
-      busyTeachersDetails: busyTeachers
-    });
-  } catch (err) {
-    console.error('getBusyTeachersForSlot error', err);
-    return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  if (!day || !rawTime) {
+    throw new AppError('day and timeSlot are required', 400);
   }
-};
+
+  // Helpers to parse time into minutes (tolerant to AM/PM and spaces)
+  const toMinutes = (t) => {
+    if (!t) return null;
+    const raw = String(t).trim();
+    const hasAM = /\bAM\b/i.test(raw);
+    const hasPM = /\bPM\b/i.test(raw);
+    const clean = raw.replace(/\s*(AM|PM)\s*/gi, '');
+    const [hStr, mStr] = clean.split(':');
+    let h = Number(hStr);
+    const m = Number(mStr || 0);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    if (hasPM && h !== 12) h += 12;
+    if (hasAM && h === 12) h = 0;
+    return h * 60 + m;
+  };
+  const parseRange = (range) => {
+    if (!range || typeof range !== 'string' || !range.includes('-')) return null;
+    const [start, end] = range.split('-').map(s => s.trim());
+    const s = toMinutes(start);
+    const e = toMinutes(end);
+    if (s == null || e == null || e <= s) return null;
+    return { s, e };
+  };
+  const overlaps = (a, b) => a && b && Math.max(a.s, b.s) < Math.min(a.e, b.e);
+
+  const qRange = parseRange(rawTime);
+  if (!qRange) throw new AppError('Invalid timeSlot format. Expected HH:MM-HH:MM (AM/PM supported)', 400);
+
+  // Load all timetables that contain the given day (case-insensitive)
+  const timetables = await Timetable.find({ 'schedule.day': { $regex: new RegExp(`^${day}$`, 'i') } }, {
+    year: 1,
+    branch: 1,
+    section: 1,
+    schedule: 1
+  }).lean();
+
+  const busyMap = new Map();
+  for (const tt of timetables) {
+    // Skip the current class being edited to avoid self-clash detection
+    if (excludeBranch && excludeYear && excludeSection) {
+      const isSameClass = 
+        tt.branch === excludeBranch &&
+        tt.year === excludeYear &&
+        tt.section === excludeSection &&
+        (!excludeAcademicYear || tt.academicYear === excludeAcademicYear) &&
+        (!excludeSemester || tt.semester === excludeSemester);
+      
+      if (isSameClass) continue;
+    }
+    
+    for (const slot of tt.schedule || []) {
+      if (!slot?.day || !new RegExp(`^${day}$`, 'i').test(slot.day)) continue;
+      if (!slot?.timeSlot) continue; // need a concrete time range
+      const sRange = parseRange(String(slot.timeSlot));
+      if (!sRange) continue;
+      if (!overlaps(qRange, sRange)) continue;
+
+      const teacherIdVal = (slot.teacher && (slot.teacher.id || slot.teacher._id)) ? String(slot.teacher.id || slot.teacher._id) : null;
+      const teacherName = slot.teacher?.name || '';
+      if (!teacherIdVal && !teacherName) continue;
+
+      const key = teacherIdVal || `name:${teacherName}`;
+      if (!busyMap.has(key)) {
+        busyMap.set(key, {
+          teacherId: teacherIdVal || '',
+          teacherName,
+          clashWith: {
+            year: tt.year,
+            branch: tt.branch,
+            section: tt.section,
+            timeSlot: slot.timeSlot
+          }
+        });
+      }
+    }
+  }
+
+  const busyTeachers = Array.from(busyMap.values());
+  const busyTeacherIds = busyTeachers.map(t => t.teacherId || t.teacherName).filter(Boolean);
+  
+  // Also return detailed information for frontend display
+  const busyTeachersDetails = busyTeachers.map(t => ({
+    id: t.teacherId || t.teacherName,
+    teacherId: t.teacherId,
+    year: t.clashWith.year,
+    branch: t.clashWith.branch,
+    section: t.clashWith.section,
+    timeSlot: t.clashWith.timeSlot,
+    classLabel: `${t.clashWith.branch || ''} . ${t.clashWith.year || ''}${t.clashWith.branch || ''}${t.clashWith.section ? `-${t.clashWith.section}` : ''}`.trim()
+  }));
+  
+  return res.json({ success: true, busyTeachers: busyTeacherIds, busyTeachersDetails });
+});
 
 /**
  * GET /api/timetable/teacher/:id  OR /api/timetable/teacher?teacherId=<idOrUsername>
@@ -971,6 +935,26 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
     room: slot.room || ''
   }))
 
+  // Cross-class teacher clash validation
+  const conflicts = [];
+  for (const s of processedSchedule) {
+    const teacherKey = s?.teacher?.id || s?.teacher?.username;
+    if (!teacherKey) continue;
+    const busy = await isTeacherBusy(
+      teacherKey,
+      s.day,
+      s.timeSlot,
+      { treatDraftsAsBusy: true, busyAcademicYear: academicYear, busySemester: semester },
+      req.body.section
+    );
+    if (busy) {
+      conflicts.push({ day: s.day, timeSlot: s.timeSlot, teacher: s.teacher, reason: 'Teacher busy in another class' });
+    }
+  }
+  if (conflicts.length) {
+    return res.status(409).json({ success: false, message: 'Teacher clash detected across classes', conflicts });
+  }
+
   const timetable = await Timetable.create({
     year,
     branch: req.body.branch,
@@ -1027,6 +1011,33 @@ export const updateTimetable = asyncHandler(async (req, res, next) => {
       type: slot.type || 'lecture',
       room: slot.room || ''
     }));
+  }
+
+  // Cross-class teacher clash validation (exclude current section to allow same-class edits)
+  const classYear = req.body.year || timetable.year;
+  const classBranch = (req.body.branch || timetable.branch || '').toUpperCase();
+  const classSection = (req.body.section || timetable.section || '').toUpperCase();
+  const classSem = req.body.semester ?? timetable.semester;
+  const classAY = req.body.academicYear || timetable.academicYear;
+
+  const scheduleToCheck = req.body.schedule || timetable.schedule || [];
+  const updConflicts = [];
+  for (const s of scheduleToCheck) {
+    const teacherKey = s?.teacher?.id || s?.teacher?.username;
+    if (!teacherKey) continue;
+    const busy = await isTeacherBusy(
+      teacherKey,
+      s.day,
+      s.timeSlot,
+      { treatDraftsAsBusy: true, busyAcademicYear: classAY, busySemester: classSem },
+      classSection
+    );
+    if (busy) {
+      updConflicts.push({ day: s.day, timeSlot: s.timeSlot, teacher: s.teacher, reason: 'Teacher busy in another class' });
+    }
+  }
+  if (updConflicts.length) {
+    return res.status(409).json({ success: false, message: 'Teacher clash detected across classes', conflicts: updConflicts });
   }
 
   // ✅ Apply update after cleaning data

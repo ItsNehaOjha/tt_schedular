@@ -396,6 +396,13 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
                     timeSlot={timeSlot}
                     slotKey={timeSlot}
                     placeholder="Select teacher…"
+                    currentClass={{
+                      branch: getBranch(),
+                      year: data?.year || timetableData?.year,
+                      section: data?.section || timetableData?.section,
+                      academicYear: data?.academicYear || timetableData?.academicYear,
+                      semester: data?.semester || timetableData?.semester
+                    }}
                   />
 
                   <input
@@ -422,6 +429,13 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
               timeSlot={timeSlot}
               slotKey={timeSlot}
               placeholder="Select teacher…"
+              currentClass={{
+                branch: getBranch(),
+                year: data?.year || timetableData?.year,
+                section: data?.section || timetableData?.section,
+                academicYear: data?.academicYear || timetableData?.academicYear,
+                semester: data?.semester || timetableData?.semester
+              }}
             />
           )}
 

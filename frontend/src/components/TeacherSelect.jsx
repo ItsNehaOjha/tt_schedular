@@ -18,6 +18,7 @@ export default function TeacherSelect({
   departmentFilter,
   disabled = false,
   placeholder = "Select teacher...",
+  currentClass = null, // { branch, year, section, academicYear, semester }
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -87,6 +88,14 @@ export default function TeacherSelect({
             day,
             slotKey: slotKey ? String(slotKey) : undefined,
             timeSlot: !slotKey && timeSlot ? String(timeSlot) : undefined,
+            // Pass current class to exclude it from clash detection
+            ...(currentClass && {
+              excludeBranch: currentClass.branch,
+              excludeYear: currentClass.year,
+              excludeSection: currentClass.section,
+              excludeAcademicYear: currentClass.academicYear,
+              excludeSemester: currentClass.semester
+            })
           },
         });
         if (!alive) return;
@@ -100,7 +109,7 @@ export default function TeacherSelect({
           const teacherId = String(teacher.id || teacher.teacherId || teacher._id);
           if (teacherId) {
             teacherDetailsMap.set(teacherId, {
-              classLabel: teacher.classLabel || `${teacher.year || ''} ${teacher.branch || ''}-${teacher.section || ''}`,
+              classLabel: teacher.classLabel || `${teacher.branch || ''} . ${teacher.year || ''}${teacher.branch || ''}${teacher.section ? `-${teacher.section}` : ''}`.trim(),
               classDetail: teacher.subject ? `${teacher.subject}${teacher.type ? ` (${teacher.type})` : ''}` : ''
             });
           }
@@ -230,15 +239,13 @@ export default function TeacherSelect({
                     </div>
 
                     <div style={styles.itemLine2}>
-                      <span>{t.department || "—"}</span>
-                      {t.teacherId && <span> • {t.teacherId}</span>}
                     </div>
 
                     {/* Display class and section information for busy teachers */}
                     {isBusy && teacherDetailsMap.has(String(t.id)) && (
                       <>
                         <div style={styles.busyClassLabel}>
-                          Busy in: {teacherDetailsMap.get(String(t.id)).classLabel}
+                          {teacherDetailsMap.get(String(t.id)).classLabel}
                         </div>
                         {teacherDetailsMap.get(String(t.id)).classDetail && (
                           <div style={styles.busyClassDetail}>
