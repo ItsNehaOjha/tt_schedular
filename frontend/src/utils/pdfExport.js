@@ -304,12 +304,23 @@ alternateRowStyles: { fillColor: [250, 250, 250] },
     const footerY = doc.internal.pageSize.getHeight() - 40;
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
+    
+    // Use stored coordinatorName from database (single source of truth)
+    const coordinatorName = timetableData.coordinatorName || "Coordinator";
+    
     doc.text(
-  `Name of Time-Table Incharge:  ${timetableData.coordinatorName || "Coordinator"}`,
-  centerX,
-  footerY,
-  { align: "center" }
-);
+      `Name of Time-Table Incharge: ${coordinatorName}`,
+      centerX,
+      footerY - 10,
+      { align: "center" }
+    );
+    
+    doc.text(
+      `Published By: ${coordinatorName}`,
+      centerX,
+      footerY,
+      { align: "center" }
+    );
 
     doc.text("Signature: HOD", pageWidth - 100, footerY);
 

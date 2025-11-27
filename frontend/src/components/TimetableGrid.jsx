@@ -5,7 +5,7 @@
   import EditModal from "../components/EditModal";
   import toast from 'react-hot-toast'
 
-  const TimetableGrid = ({ onBack, onSave, onPublish, data, timetableData, mode, isEditable, showPDFExport = false, savedTimetableId = null, isPublished = false }) => {
+  const TimetableGrid = ({ onBack, onSave, onPublish, data, timetableData, mode, isEditable, showPDFExport = false, savedTimetableId = null, isPublished = false, coordinatorName = null }) => {
     const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
     const defaultTimeSlots = ['08:50-09:40', '09:40-10:30', '10:30-11:20', '11:20-12:10', '12:10-13:00', '13:00-13:50', '13:50-14:40', '14:40-15:30', '15:30-16:20']
 
@@ -742,7 +742,8 @@ if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
             ...timetableInfo,
             schedule: scheduleArray,
             isPublished: true,
-            publishedAt: new Date().toISOString()
+            publishedAt: new Date().toISOString(),
+            coordinatorName: coordinatorName || 'Coordinator'
           })
           clearLocalTimetableData()
         }
@@ -755,15 +756,22 @@ if (cellData.type === 'split-lab' && Array.isArray(cellData.parallelSessions)) {
     // ---------- PDF export ----------
     const handleExportPDF = () => {
       import('../utils/pdfExport').then(({ exportToPDF }) => {
+        // ✅ Prioritize stored coordinatorName from database (single source of truth)
+        // Only use prop coordinatorName if timetableData doesn't have it (for drafts/unpublished)
+        const coordinatorNameForPDF = (timetableData?.coordinatorName && timetableData.coordinatorName.trim()) 
+          ? timetableData.coordinatorName 
+          : (coordinatorName || 'Coordinator')
+        
         const timetableDataForPDF = {
-          year: timetableInfo.year || 'Unknown Year',
-          branch: timetableInfo.branch || 'Unknown Branch',
-          section: timetableInfo.section || 'Unknown Section',
+          year: timetableInfo.year || timetableData?.year || 'Unknown Year',
+          branch: timetableInfo.branch || timetableData?.branch || 'Unknown Branch',
+          section: timetableInfo.section || timetableData?.section || 'Unknown Section',
           schedule: scheduleData,
           timeSlots: timeSlots,
           days: days,
-          semester: timetableInfo.semester || '',
-          academicYear: timetableInfo.academicYear || new Date().getFullYear()
+          semester: timetableInfo.semester || timetableData?.semester || '',
+          academicYear: timetableInfo.academicYear || timetableData?.academicYear || new Date().getFullYear(),
+          coordinatorName: coordinatorNameForPDF
         }
         try {
           exportToPDF(timetableDataForPDF)

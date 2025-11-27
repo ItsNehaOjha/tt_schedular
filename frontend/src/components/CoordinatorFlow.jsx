@@ -168,11 +168,35 @@ const CoordinatorFlow = ({ user, onLogout }) => {
         return
       }
 
+      // Extract coordinator's full name from localStorage
+      const getCoordinatorName = () => {
+        try {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+          const salutation = storedUser?.salutation ? `${storedUser.salutation}.` : 'Mr.'
+          const first = storedUser?.firstName?.trim() || ''
+          const last = storedUser?.lastName?.trim() || ''
+          const fullName = [salutation, first, last].filter(Boolean).join(' ').trim()
+          
+          if (!fullName || fullName === 'Mr.') {
+            return storedUser?.cname || storedUser?.displayName || user?.cname || user?.displayName || 'Coordinator'
+          }
+          return fullName
+        } catch (err) {
+          console.error('Error extracting coordinator name:', err)
+          return user?.cname || user?.displayName || 'Coordinator'
+        }
+      }
+
+      const coordinatorName = getCoordinatorName()
+
       // First save the current data
       await handleSave(scheduleData)
 
-      // Then publish
-      const response = await timetableAPI.publishTimetable(selectedTimetable.id, { isPublished: true })
+      // Then publish with coordinatorName
+      const response = await timetableAPI.publishTimetable(selectedTimetable.id, { 
+        isPublished: true,
+        coordinatorName: coordinatorName
+      })
       
       // Update the selected timetable
       const updatedTimetable = {
@@ -368,6 +392,18 @@ const CoordinatorFlow = ({ user, onLogout }) => {
                   onSave={handleSave}
                   onPublish={handlePublish}
                   onBack={handleBack}
+                  coordinatorName={(() => {
+                    try {
+                      const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+                      const salutation = storedUser?.salutation ? `${storedUser.salutation}.` : 'Mr.'
+                      const first = storedUser?.firstName?.trim() || ''
+                      const last = storedUser?.lastName?.trim() || ''
+                      const fullName = [salutation, first, last].filter(Boolean).join(' ').trim()
+                      return fullName && fullName !== 'Mr.' ? fullName : (storedUser?.cname || storedUser?.displayName || user?.cname || user?.displayName || 'Coordinator')
+                    } catch {
+                      return user?.cname || user?.displayName || 'Coordinator'
+                    }
+                  })()}
                 />
               </div>
             )}
@@ -392,6 +428,18 @@ const CoordinatorFlow = ({ user, onLogout }) => {
                   onSave={handleSave}
                   onPublish={handlePublish}
                   onBack={handleBack}
+                  coordinatorName={(() => {
+                    try {
+                      const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+                      const salutation = storedUser?.salutation ? `${storedUser.salutation}.` : 'Mr.'
+                      const first = storedUser?.firstName?.trim() || ''
+                      const last = storedUser?.lastName?.trim() || ''
+                      const fullName = [salutation, first, last].filter(Boolean).join(' ').trim()
+                      return fullName && fullName !== 'Mr.' ? fullName : (storedUser?.cname || storedUser?.displayName || user?.cname || user?.displayName || 'Coordinator')
+                    } catch {
+                      return user?.cname || user?.displayName || 'Coordinator'
+                    }
+                  })()}
                 />
               </div>
             )}

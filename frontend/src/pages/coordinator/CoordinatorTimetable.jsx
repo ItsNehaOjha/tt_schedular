@@ -21,6 +21,29 @@ const CoordinatorTimetable = () => {
   const [showGenerator, setShowGenerator] = useState(false)
   const [generatedDraftId, setGeneratedDraftId] = useState(null)
 
+  // === Extract coordinator's full name from localStorage ===
+  const getCoordinatorName = () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      // Build full name: salutation + firstName + lastName
+      const salutation = user?.salutation ? `${user.salutation}.` : 'Mr.'
+      const first = user?.firstName?.trim() || ''
+      const last = user?.lastName?.trim() || ''
+      const fullName = [salutation, first, last].filter(Boolean).join(' ').trim()
+      
+      // Fallback to cname or displayName if firstName/lastName not available
+      if (!fullName || fullName === 'Mr.') {
+        return user?.cname || user?.displayName || 'Coordinator'
+      }
+      return fullName
+    } catch (err) {
+      console.error('Error extracting coordinator name:', err)
+      return 'Coordinator'
+    }
+  }
+
+  const coordinatorName = getCoordinatorName()
+
   // === Helper to unwrap axios responses ===
   const unwrapResponse = (response) => {
     if (!response) return null
@@ -440,6 +463,7 @@ const fetchExistingTimetable = async (classData) => {
           onPublish={handlePublishTimetable}
           savedTimetableId={savedTimetableId}
           isPublished={isPublished}
+          coordinatorName={coordinatorName}
         />
       </div>
     )}
@@ -471,6 +495,7 @@ const fetchExistingTimetable = async (classData) => {
           mode="edit"
           savedTimetableId={savedTimetableId}
           isPublished={isPublished}
+          coordinatorName={coordinatorName}
         />
       </div>
     )}
