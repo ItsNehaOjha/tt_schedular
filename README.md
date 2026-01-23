@@ -44,22 +44,185 @@ A complete full-stack web application for managing educational timetables with r
 - **jsPDF** - PDF generation
 - **Lucide React** - Icons
 
-## 📁 Project Structure
+## 📂 Project Structure (High-Level)
 
-# React + Vite
+```bash
+backend/
+  src/
+    app.js
+    server.js
+    config/
+    controllers/
+    middleware/
+    models/
+    routes/
+    utils/
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+frontend/
+  src/
+    components/
+    pages/
+    hooks/
+    utils/
+    styles/
+```
 
-Currently, two official plugins are available:
+* **backend/** → REST APIs, auth, business rules, DB logic
+* **frontend/** → React UI, timetable views, PDF export
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ⚙️ Environment Setup
 
-The React Compiler is not enabled on this template. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend (`backend/.env`)
 
-## Expanding the ESLint configuration
+```env
+PORT=5000
+MONGO_URI=your_mongodb_atlas_uri
+JWT_SECRET=your_long_secure_secret
+NODE_ENV=development
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-"# tt_schedular" 
+### Frontend (`frontend/.env`)
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+⚠️ **Important:** Always include `/api` in `VITE_API_URL`.
+
+---
+
+## ▶️ Getting Started (Local Setup)
+
+### 1️⃣ Clone the repository
+
+```bash
+git clone https://github.com/your-username/timetable-management-system.git
+cd timetable-management-system
+```
+
+### 2️⃣ Install dependencies
+
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### 3️⃣ Run the application
+
+```bash
+# Start backend
+cd backend
+npm run dev
+
+# Start frontend
+cd ../frontend
+npm run dev
+```
+
+* Backend runs on: `http://localhost:5000`
+* Frontend runs on: `http://localhost:5173`
+
+---
+
+## 🔐 Authentication & Roles
+
+| Role        | Login Required | Permissions                 |
+| ----------- | -------------- | --------------------------- |
+| Student     | ❌ No           | View & export timetable     |
+| Teacher     | ✅ Yes          | View personal schedule      |
+| Coordinator | ✅ Yes          | Full CRUD + publish control |
+
+Authentication uses **JWT tokens** with role-based route protection.
+
+---
+
+## 📄 PDF Export
+
+* Students and teachers can export timetables as PDF
+* Client-side PDF generation using **jsPDF**
+* No server-side rendering required
+
+---
+
+## 🛡 Security Highlights
+
+* JWT authentication & role-based authorization
+* Input validation using `express-validator`
+* API protection via rate limiting
+* XSS & NoSQL injection prevention
+* Secure CORS configuration
+
+---
+
+## 🧠 Design Decisions
+
+* **No student login** → frictionless access
+* **Role-based middleware** → clean authorization logic
+* **Draft + publish flow** → prevents accidental timetable exposure
+* **Compound DB indexes** → avoids duplicate timetables
+* **Client-side PDF export** → reduced backend load
+
+---
+
+## 📌 Limitations
+
+* Real-time updates require manual refresh (WebSocket support planned)
+* Mobile app not implemented yet
+* No public API for external integrations
+
+---
+
+## 🔮 Future Improvements
+
+* WebSocket-based live timetable updates
+* Mobile-first UI & PWA support
+* Redis caching for faster reads
+* Audit logs for timetable changes
+* Admin analytics dashboard
+* Multi-institution support
+
+---
+
+## 🤝 Contribution Guidelines
+
+Contributions are welcome.
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes with clear messages
+4. Open a pull request
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**.
+You are free to use, modify, and distribute it.
+
+---
+
+## 👩‍💻 Author
+
+**Neha Ojha**
+
+* GitHub: [https://github.com/ItsNehaOjha](https://github.com/ItsNehaOjha)
+* LinkedIn: [https://linkedin.com/in/neha-ojha0028](https://linkedin.com/in/neha-ojha0028)
+
+---
+
+## ⭐ Final Note
+
+This project was built to solve **real institutional scheduling problems**,
+focusing on **clean architecture**, **security**, and **practical usability**.
+
+If you’re a recruiter or developer reviewing this repo:
+👉 **Start with `backend/src/app.js` to understand the request lifecycle.**
+
+---
