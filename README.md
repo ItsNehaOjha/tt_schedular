@@ -21,6 +21,17 @@ A full-stack Timetable Management System designed to streamline academic schedul
 - Real-time editing interface
 - Dashboard with statistics
 
+🔐 Demo Access (For Evaluation Only)
+
+A pre-seeded demonstration coordinator account is available to explore the system features without manual setup:
+
+Coordinator ID: 032026
+Password: 111111
+
+
+⚠️ This account has limited privileges and is intended solely for testing the deployed application interface.
+
+
 ## 🛠 Tech Stack
 
 ### Backend
