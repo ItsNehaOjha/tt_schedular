@@ -12,7 +12,8 @@
 
     "build": "cd frontend && npm install && npm run build",
 
-    "start": "cd backend && npm install && node src/server.js"
+    "start": "node backend/src/server.js"
+
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
