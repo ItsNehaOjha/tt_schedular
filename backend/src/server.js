@@ -1,41 +1,45 @@
-import app from './app.js'
-import connectDB from './config/db.js'
-import dotenv from 'dotenv'
+import app from "./app.js";
+import connectDB from "./config/db.js";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Load env vars
-dotenv.config()
+// ================= LOAD ROOT .ENV =================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Connect to database
-connectDB()
-
-const DEFAULT_PORT = process.env.PORT || 5001;
-const server = app.listen(DEFAULT_PORT, () => {
-  console.log(`Server running on port ${DEFAULT_PORT}`);
+// 👇 IMPORTANT: load env from project ROOT
+dotenv.config({
+  path: path.resolve(__dirname, "../../.env")
 });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.warn(`Port ${DEFAULT_PORT} is busy, trying another port...`);
-    const newPort = Number(DEFAULT_PORT) + 1;
-    app.listen(newPort, () => console.log(`Server switched to port ${newPort}`));
-  } else {
-    console.error('Server error:', err);
+const PORT = process.env.PORT || 5001;
+
+// ================= START SERVER AFTER DB =================
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+
+  } catch (err) {
+    console.error("DB Connection Failed:", err.message);
+    process.exit(1);
   }
+};
+
+// ================= GLOBAL CRASH HANDLERS =================
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err.message);
+  process.exit(1);
 });
 
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err.message);
+  process.exit(1);
+});
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`)
-  // Close server & exit process
-  server.close(() => {
-    process.exit(1)
-  })
-})
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.log(`Error: ${err.message}`)
-  console.log('Shutting down due to uncaught exception')
-  process.exit(1)
-})
+// ================= BOOT =================
+startServer();
