@@ -1,183 +1,103 @@
 # Timetable Management System
 
-A complete full-stack web application for managing educational timetables with role-based access control.
+A full-stack Timetable Management System designed to streamline academic scheduling in educational institutions using a **role-based access model**.
 
 ## 🚀 Features
 
-### Student Features (No Login Required)
-- Select Year → Branch → Section to view timetable
-- Modern responsive grid layout
-- PDF export functionality
-- Auto-refresh when timetables are updated
+### 🎓 Student Features
+- View timetables by Year → Branch → Section
+- Responsive grid-based timetable layout
+- Download timetable as PDF
+- Auto-refresh on updates
 
-### Teacher Features (Login Required)
+### 👨‍🏫 Teacher Features
 - View personal teaching schedule
-- Read-only timetable access
-- PDF export of personal schedule
+- Export schedule as PDF
+- Read-only access to relevant timetables
 
-### Coordinator Features (Login Required)
-- Complete CRUD operations on timetables
-- Manage both student and teacher timetables
-- Real-time editing with modal interface
+### 🧑‍💼 Coordinator Features
+- Full CRUD operations for timetables
+- Manage teachers, subjects, and classes
 - Publish/unpublish timetables
+- Real-time editing interface
 - Dashboard with statistics
 
 ## 🛠 Tech Stack
 
 ### Backend
-- **Node.js** + **Express.js** - Server framework
-- **MongoDB** + **Mongoose** - Database and ODM
-- **JWT** - Authentication
-- **bcryptjs** - Password hashing
-- **express-validator** - Input validation
-- **CORS** - Cross-origin resource sharing
-- **Helmet** - Security middleware
-- **Rate limiting** - API protection
+- **Node.js** + **Express.js**
+- **MongoDB Atlas** + **Mongoose**
+- **JWT Authentication**
+- **bcryptjs** for password hashing
+- **Helmet** for security headers
+- **Rate Limiting** for API protection
 
 ### Frontend
-- **React 18** + **Vite** - UI framework and build tool
-- **TailwindCSS** - Styling
-- **Framer Motion** - Animations
-- **React Router** - Navigation
-- **React Query** - Data fetching and caching
-- **Axios** - HTTP client
-- **jsPDF** - PDF generation
-- **Lucide React** - Icons
+- **React 18** + **Vite**
+- **TailwindCSS** for styling
+- **React Router** for navigation
+- **React Query** for data fetching
+- **Framer Motion** for animations
+- **jsPDF** for client-side PDF generation
+- **Lucide React** for icons
 
-## 📂 Project Structure (High-Level)
+## 📦 Quick Start
 
-```bash
-backend/
-  src/
-    app.js
-    server.js
-    config/
-    controllers/
-    middleware/
-    models/
-    routes/
-    utils/
+1. Clone the repository
+   ```bash
+   git clone https://github.com/ItsNehaOjha/tt_schedular.git
+   cd tt_schedular
+   ```
 
-frontend/
-  src/
-    components/
-    pages/
-    hooks/
-    utils/
-    styles/
-```
+2. Install dependencies
+   ```bash
+   npm install
+   cd frontend && npm install
+   cd ../backend && npm install
+   cd ..
+   ```
 
-* **backend/** → REST APIs, auth, business rules, DB logic
-* **frontend/** → React UI, timetable views, PDF export
+3. Set up environment variables (see [SETUP.md](./SETUP.md))
 
----
+4. Start development servers
+   ```bash
+   # In root directory
+   npm run dev
+   ```
 
-## ⚙️ Environment Setup
-
-### Backend (`backend/.env`)
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_atlas_uri
-JWT_SECRET=your_long_secure_secret
-NODE_ENV=development
-```
-
-### Frontend (`frontend/.env`)
-
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-
-⚠️ **Important:** Always include `/api` in `VITE_API_URL`.
-
----
-
-## ▶️ Getting Started (Local Setup)
-
-### 1️⃣ Clone the repository
-
-```bash
-git clone https://github.com/your-username/timetable-management-system.git
-cd timetable-management-system
-```
-
-### 2️⃣ Install dependencies
-
-```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-```
-
-### 3️⃣ Run the application
-
-```bash
-# Start backend
-cd backend
-npm run dev
-
-# Start frontend
-cd ../frontend
-npm run dev
-```
-
-* Backend runs on: `http://localhost:5000`
-* Frontend runs on: `http://localhost:5173`
-
----
+For detailed setup and deployment instructions, see [SETUP.md](./SETUP.md).
 
 ## 🔐 Authentication & Roles
 
 | Role        | Login Required | Permissions                 |
-| ----------- | -------------- | --------------------------- |
-| Student     | ❌ No           | View & export timetable     |
-| Teacher     | ✅ Yes          | View personal schedule      |
-| Coordinator | ✅ Yes          | Full CRUD + publish control |
-
-Authentication uses **JWT tokens** with role-based route protection.
-
----
-
-## 📄 PDF Export
-
-* Students and teachers can export timetables as PDF
-* Client-side PDF generation using **jsPDF**
-* No server-side rendering required
-
----
+|-------------|----------------|-----------------------------|
+| Student     | ❌ No          | View & export timetable     |
+| Teacher     | ✅ Yes         | View personal schedule      |
+| Coordinator | ✅ Yes         | Full CRUD + publish control |
 
 ## 🛡 Security Highlights
 
-* JWT authentication & role-based authorization
-* Input validation using `express-validator`
-* API protection via rate limiting
-* XSS & NoSQL injection prevention
-* Secure CORS configuration
-
----
+- JWT-based authentication
+- Role-based access control
+- Input validation and sanitization
+- Rate limiting on API endpoints
+- Secure HTTP headers
+- CSRF protection
+- Secure CORS configuration
 
 ## 🧠 Design Decisions
 
-* **No student login** → frictionless access
-* **Role-based middleware** → clean authorization logic
-* **Draft + publish flow** → prevents accidental timetable exposure
-* **Compound DB indexes** → avoids duplicate timetables
-* **Client-side PDF export** → reduced backend load
-
----
+* **No student login** → Frictionless timetable access
+* **Role-based middleware** → Clean authorization logic
+* **Draft + publish flow** → Prevents accidental exposure
+* **Client-side PDF export** → Reduced backend load
+* **Monolithic MERN architecture** → Simplified deployment and same-origin API communication
 
 ## 📌 Limitations
 
 * Real-time updates require manual refresh (WebSocket support planned)
 * Mobile app not implemented yet
 * No public API for external integrations
-
----
 
 ## 🔮 Future Improvements
 
@@ -188,41 +108,27 @@ Authentication uses **JWT tokens** with role-based route protection.
 * Admin analytics dashboard
 * Multi-institution support
 
----
+## 🤝 Contributing
 
-## 🤝 Contribution Guidelines
-
-Contributions are welcome.
+Contributions are welcome! Please follow these steps:
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit changes with clear messages
-4. Open a pull request
-
----
+3. Commit your changes with clear messages
+4. Push to the branch
+5. Open a pull request
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
-You are free to use, modify, and distribute it.
-
----
+Licensed under the **MIT License**.
 
 ## 👩‍💻 Author
 
 **Neha Ojha**
 
-* GitHub: [https://github.com/ItsNehaOjha](https://github.com/ItsNehaOjha)
-* LinkedIn: [https://linkedin.com/in/neha-ojha0028](https://linkedin.com/in/neha-ojha0028)
+- GitHub: [@ItsNehaOjha](https://github.com/ItsNehaOjha)
+- LinkedIn: [neha-ojha0028](https://linkedin.com/in/neha-ojha0028)
 
 ---
 
-## ⭐ Final Note
-
-This project was built to solve **real institutional scheduling problems**,
-focusing on **clean architecture**, **security**, and **practical usability**.
-
-If you’re a recruiter or developer reviewing this repo:
-👉 **Start with `backend/src/app.js` to understand the request lifecycle.**
-
----
+*For detailed setup, deployment, and troubleshooting, please refer to [SETUP.md](./SETUP.md).*
