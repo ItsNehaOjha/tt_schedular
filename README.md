@@ -1,5 +1,8 @@
 # Timetable Management System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-tt--schedular.onrender.com-brightgreen)](https://tt-schedular.onrender.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/ItsNehaOjha/tt_schedular)
+
 A full-stack Timetable Management System designed to streamline academic scheduling in educational institutions using a **role-based access model**.
 
 ## 🚀 Features
