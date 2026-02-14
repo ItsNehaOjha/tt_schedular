@@ -12,7 +12,6 @@ A full-stack Timetable Management System designed to streamline academic schedul
 
 ### 👨‍🏫 Teacher Features
 - View personal teaching schedule
-- Export schedule as PDF
 - Read-only access to relevant timetables
 
 ### 🧑‍💼 Coordinator Features
