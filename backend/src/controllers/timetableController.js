@@ -1,5 +1,6 @@
 // backend/controllers/timetableController.js
 import { validationResult } from 'express-validator'
+import jwt from 'jsonwebtoken'
 import Timetable from '../models/Timetable.js'
 import User from '../models/User.js'
 import Subject from '../models/Subject.js'
@@ -163,7 +164,9 @@ if (!sectionsToGenerate.length) {
     const existing = await Timetable.findOne({
       year,
       branch: branch.toUpperCase(),
-      section: section.toUpperCase()
+      section: section.toUpperCase(),
+      semester,
+      academicYear
     }).lean();
     if (existing && !options.overwriteExisting) {
       return res.status(409).json({
@@ -535,16 +538,25 @@ export const getTimetables = asyncHandler(async (req, res, next) => {
 ============================================================ */
 export const getTimetableByBranchSection = asyncHandler(async (req, res, next) => {
   const { branch, section } = req.params
-  const { year } = req.query
+  const { year, semester, academicYear } = req.query
 
-  
-
-  const timetable = await Timetable.findOne({
+  const query = {
     year,
     branch: branch.toUpperCase(),
     section: section.toUpperCase(),
     isPublished: true
-  }).populate('createdBy', 'username firstName lastName')
+  }
+
+  if (semester) {
+    query.semester = Number(semester)
+  }
+  if (academicYear) {
+    query.academicYear = academicYear
+  }
+
+  const timetable = await Timetable.findOne(query)
+    .sort({ academicYear: -1, semester: -1, updatedAt: -1 })
+    .populate('createdBy', 'username firstName lastName')
 
   if (!timetable) {
   return res.status(200).json({
@@ -570,10 +582,10 @@ export const getTimetableByBranchSection = asyncHandler(async (req, res, next) =
    Access: Public
 ============================================================ */
 export const viewTimetable = asyncHandler(async (req, res, next) => {
-  const { year, branch, section } = req.query
+  const { year, branch, section, semester, academicYear } = req.query
 
-  if (!year || !branch || !section) {
-    return next(new AppError('Year, branch, and section are required', 400))
+  if (!year || !branch || !section || !semester || !academicYear) {
+    return next(new AppError('Year, branch, section, semester, and academic year are required', 400))
   }
 
   const yearMapping = {
@@ -584,12 +596,40 @@ export const viewTimetable = asyncHandler(async (req, res, next) => {
   }
   const mappedYear = yearMapping[year] || year
 
-  const timetable = await Timetable.findOne({
+  let isCoordinator = false
+  let token
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1]
+  } else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token
+  }
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+      const user = await User.findById(decoded.id)
+      if (user && user.role === 'coordinator' && user.isActive) {
+        isCoordinator = true
+      }
+    } catch (err) {
+      // Ignore token verification errors to fall back to public published-only queries
+    }
+  }
+
+  const query = {
     year: mappedYear,
     branch: branch.toUpperCase(),
     section: section.toUpperCase(),
-    isPublished: true
-  }).populate('createdBy', 'username firstName lastName')
+    semester: Number(semester),
+    academicYear
+  }
+
+  if (!isCoordinator) {
+    query.isPublished = true
+  }
+
+  const timetable = await Timetable.findOne(query).populate('createdBy', 'username firstName lastName')
 
   if (!timetable) {
   return res.status(200).json({
@@ -759,14 +799,24 @@ export const getTeacherTimetable = asyncHandler(async (req, res) => {
   if (!teacher) throw new AppError('Teacher not found', 404);
 
   // 2) Find ALL published timetables where teacher is present (Flexible matching in schedule)
-  const tts = await Timetable.find({
+  const { semester, academicYear } = req.query;
+  const filter = {
     isPublished: true,
     $or: [
       { 'schedule.teacher.id': teacher._id },                // Match by MongoDB _id
       { 'schedule.teacherId': teacher.teacherId },          // Match by custom teacherId
       { 'schedule.teacher.name': new RegExp(teacher.firstName.split(' ')[0], 'i') } // Match by partial name (e.g. "Tushar")
     ]
-  }).sort({ publishedAt: -1, updatedAt: -1 }).lean();
+  };
+
+  if (semester) {
+    filter.semester = Number(semester);
+  }
+  if (academicYear) {
+    filter.academicYear = academicYear;
+  }
+
+  const tts = await Timetable.find(filter).sort({ publishedAt: -1, updatedAt: -1 }).lean();
 
   if (!tts.length) {
     return res.status(404).json({ success: false, message: 'No teaching schedule found' });
@@ -860,15 +910,17 @@ export const getTeacherTimetable = asyncHandler(async (req, res) => {
    Access: Private (Coordinator)
 ============================================================ */
 export const getTimetableByClass = asyncHandler(async (req, res, next) => {
-  const { year, branch, section } = req.query
-  if (!year || !branch || !section) {
-    return next(new AppError('Year, branch, and section are required', 400))
+  const { year, branch, section, semester, academicYear } = req.query
+  if (!year || !branch || !section || !semester || !academicYear) {
+    return next(new AppError('Year, branch, section, semester, and academic year are required', 400))
   }
 
   const timetable = await Timetable.findOne({
     year,
     branch: branch.toUpperCase(),
-    section: section.toUpperCase()
+    section: section.toUpperCase(),
+    semester: Number(semester),
+    academicYear
   })
     .sort({ updatedAt: -1 })
     .populate('createdBy', 'username firstName lastName')
@@ -903,7 +955,13 @@ export const createTimetable = asyncHandler(async (req, res, next) => {
   if (branch) req.body.branch = branch.toUpperCase();
   if (section) req.body.section = section.toUpperCase();
 
-  const existing = await Timetable.findOne({ year, branch: req.body.branch, section: req.body.section })
+  const existing = await Timetable.findOne({ 
+    year, 
+    branch: req.body.branch, 
+    section: req.body.section,
+    semester,
+    academicYear
+  })
   if (existing) {
     return res.status(200).json({
       success: true,

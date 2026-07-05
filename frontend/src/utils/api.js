@@ -29,7 +29,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Don't redirect on login endpoint 401 errors - let the login page handle it
+    const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+    
+    if (error.response?.status === 401 && !isLoginEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/coordinator/login';
@@ -52,6 +55,7 @@ export const authAPI = {
 
 export const teacherAPI = {
   getTeachers: () => api.get('/coordinator/teachers'),
+  getAllTeachers: () => api.get('/coordinator/teachers'),
   createTeacher: (data) => api.post('/coordinator/create-teacher', data),
   updateTeacher: (id, data) => api.put(`/coordinator/teachers/${id}`, data),
   deleteTeacher: (id) => api.delete(`/coordinator/teachers/${id}`),

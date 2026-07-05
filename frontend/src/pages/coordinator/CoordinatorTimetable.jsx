@@ -1,14 +1,17 @@
 // src/pages/coordinator/CoordinatorTimetable.jsx
 import React, { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Calendar, Edit, Wand2 } from 'lucide-react'
+import { Calendar, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TimetableSelector from '../../components/TimetableSelector'
 import TimetableGrid from '../../components/TimetableGrid'
 import SampleTimetableConfigForm from '../../components/SampleTimetableConfigForm'
-import api, { timetableAPI } from '../../utils/api'
+import { timetableAPI } from '../../utils/api'
 
-const CoordinatorTimetable = () => {
+const CoordinatorTimetable = ({ onStepChange }) => {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [currentStep, setCurrentStep] = useState('selector')
   const [selectedClass, setSelectedClass] = useState(null)
   const [timetableData, setTimetableData] = useState(null)
@@ -21,17 +24,25 @@ const CoordinatorTimetable = () => {
   const [showGenerator, setShowGenerator] = useState(false)
   const [generatedDraftId, setGeneratedDraftId] = useState(null)
 
+  // Notify parent dashboard of step changes (to hide/show sidebar)
+  useEffect(() => {
+    if (onStepChange) {
+      onStepChange(currentStep === 'grid' || currentStep === 'edit')
+    }
+    return () => {
+      if (onStepChange) onStepChange(false)
+    }
+  }, [currentStep, onStepChange])
+
   // === Extract coordinator's full name from localStorage ===
   const getCoordinatorName = () => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
-      // Build full name: salutation + firstName + lastName
       const salutation = user?.salutation ? `${user.salutation}.` : 'Mr.'
       const first = user?.firstName?.trim() || ''
       const last = user?.lastName?.trim() || ''
       const fullName = [salutation, first, last].filter(Boolean).join(' ').trim()
       
-      // Fallback to cname or displayName if firstName/lastName not available
       if (!fullName || fullName === 'Mr.') {
         return user?.cname || user?.displayName || 'Coordinator'
       }
@@ -44,52 +55,45 @@ const CoordinatorTimetable = () => {
 
   const coordinatorName = getCoordinatorName()
 
-  // === Helper to unwrap axios responses ===
   const unwrapResponse = (response) => {
     if (!response) return null
     if (response.data?.data) return response.data.data
     if (response.data?.year) return response.data
     return response
   }
-  // src/pages/coordinator/CoordinatorTimetable.jsx
-// ...imports unchanged...
 
-// inside component:
-
-// === Fetch existing timetable ===
-const fetchExistingTimetable = async (classData) => {
-  try {
-    setLoading(true)
-    // FIX: use viewTimetable instead of /timetable/class (404)
-    const response = await timetableAPI.viewTimetable({
-      year: classData.year,
-      branch: classData.branch,
-      section: classData.section,
-      semester: classData.semester,
-      academicYear: classData.academicYear
-    })
-    const data = unwrapResponse(response)
-    if (data) {
-      setTimetableData(data)
-      setSavedTimetableId(data._id || data.id)
-      setIsPublished(Boolean(data.isPublished))
-    } else {
-      setTimetableData(null)
-      setSavedTimetableId(null)
-      setIsPublished(false)
+  // === Fetch existing timetable ===
+  const fetchExistingTimetable = async (classData) => {
+    try {
+      setLoading(true)
+      const response = await timetableAPI.viewTimetable({
+        year: classData.year,
+        branch: classData.branch,
+        section: classData.section,
+        semester: classData.semester,
+        academicYear: classData.academicYear
+      })
+      const data = unwrapResponse(response)
+      if (data) {
+        setTimetableData(data)
+        setSavedTimetableId(data._id || data.id)
+        setIsPublished(Boolean(data.isPublished))
+      } else {
+        setTimetableData(null)
+        setSavedTimetableId(null)
+        setIsPublished(false)
+      }
+    } catch (err) {
+      console.error('Fetch timetable error:', err)
+      if (err.response?.status === 404) {
+        setTimetableData(null)
+      } else {
+        toast.error('Failed to fetch timetable')
+      }
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error('Fetch timetable error:', err)
-    if (err.response?.status === 404) {
-      setTimetableData(null)
-    } else {
-      toast.error('Failed to fetch timetable')
-    }
-  } finally {
-    setLoading(false)
   }
-}
-
 
   // === Sample Timetable Generator Handlers ===
   const handleOpenGenerator = () => {
@@ -107,7 +111,6 @@ const fetchExistingTimetable = async (classData) => {
     setShowGenerator(false)
 
     try {
-      // If an existing timetable was found in preflight, open it directly
       if (existing) {
         setTimetableData(existing)
         setSavedTimetableId(existing._id || existing.id)
@@ -118,13 +121,11 @@ const fetchExistingTimetable = async (classData) => {
       }
 
       if (selectedClass && draftId) {
-        // Open specific draft if id returned
         await fetchDraftTimetable(draftId)
         return
       }
 
       if (selectedClass) {
-        // Fallback: try viewing the class timetable (respects academic year)
         setLoading(true)
         try {
           const resp = await timetableAPI.viewTimetable({
@@ -145,7 +146,6 @@ const fetchExistingTimetable = async (classData) => {
           }
         } catch {}
 
-        // Try fetching latest draft explicitly (now filtered by semester and academicYear)
         const listResp = await timetableAPI.getTimetables({
           year: selectedClass.year,
           branch: (selectedClass.branch || '').toUpperCase(),
@@ -184,8 +184,8 @@ const fetchExistingTimetable = async (classData) => {
       if (data) {
         setTimetableData(data)
         setSavedTimetableId(data._id || data.id)
-        setIsPublished(false) // Drafts are not published
-        setCurrentStep('edit') // Move directly to edit mode
+        setIsPublished(false)
+        setCurrentStep('edit')
         toast.success('Draft timetable loaded successfully')
       }
     } catch (err) {
@@ -246,9 +246,6 @@ const fetchExistingTimetable = async (classData) => {
       localStorage.setItem('coordinatorTimetable_currentStep', currentStep)
   }, [currentStep, selectedClass, timetableData])
 
-  // === Fetch existing timetable ===
- 
-
   const handleClassSelection = async (classData) => {
     setSelectedClass(classData)
     setCurrentStep('grid')
@@ -256,17 +253,34 @@ const fetchExistingTimetable = async (classData) => {
   }
 
   const handleBackToSelector = () => {
-    localStorage.removeItem('coordinatorTimetable_selectedClass')
-    localStorage.removeItem('coordinatorTimetable_timetableData')
-    setSelectedClass(null)
-    setTimetableData(null)
-    setSavedTimetableId(null)
-    setIsPublished(false)
-    setCurrentStep('selector')
+    if (location.state?.origin === 'dashboard') {
+      localStorage.removeItem('coordinatorTimetable_selectedClass')
+      localStorage.removeItem('coordinatorTimetable_timetableData')
+      localStorage.removeItem('coordinatorTimetable_currentStep')
+      navigate('/coordinator/dashboard/home')
+    } else {
+      localStorage.removeItem('coordinatorTimetable_selectedClass')
+      localStorage.removeItem('coordinatorTimetable_timetableData')
+      setSelectedClass(null)
+      setTimetableData(null)
+      setSavedTimetableId(null)
+      setIsPublished(false)
+      setCurrentStep('selector')
+    }
   }
 
   const handleEditTimetable = () => setCurrentStep('edit')
-  const handleBackToGrid = () => setCurrentStep('grid')
+  
+  const handleBackToGrid = () => {
+    if (location.state?.origin === 'dashboard') {
+      localStorage.removeItem('coordinatorTimetable_selectedClass')
+      localStorage.removeItem('coordinatorTimetable_timetableData')
+      localStorage.removeItem('coordinatorTimetable_currentStep')
+      navigate('/coordinator/dashboard/home')
+    } else {
+      setCurrentStep('grid')
+    }
+  }
 
   // === Sanitize schedule ===
   const sanitizeSchedule = (schedule) => {
@@ -365,18 +379,16 @@ const fetchExistingTimetable = async (classData) => {
         return toast.error('Missing class identifiers for publish (year, branch, section, semester, academicYear)')
       }
 
-      console.log('Publish payload:', payload)
-
       const response = await timetableAPI.publishTimetable(id, payload)
       const updated = unwrapResponse(response)
       if (updated) {
         setTimetableData(updated)
         setIsPublished(Boolean(updated.isPublished))
-        toast.success('Timetable published')
+        // Display single success notification
+        toast.success('Timetable published successfully.')
       }
     } catch (err) {
       console.error('Publish timetable error:', err)
-      if (err?.response?.data) console.error('Publish error response:', err.response.data)
       toast.error(err?.response?.data?.message || 'Failed to publish timetable')
     } finally {
       if (toastId) toast.dismiss(toastId)
@@ -384,123 +396,108 @@ const fetchExistingTimetable = async (classData) => {
   }
 
   return (
-  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-    {currentStep === 'selector' && (
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Calendar className="w-8 h-8 text-purple-500 mr-3" />
-            <h1 className="text-3xl font-bold text-gray-900">Build Timetable</h1>
+    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+      
+      {/* Selector view */}
+      {currentStep === 'selector' && (
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-6 select-none text-left flex items-start justify-between">
+            <div>
+              <div className="flex items-center mb-3">
+                <Calendar className="w-7 h-7 text-purple-500 mr-2.5" />
+                <h1 className="text-2xl font-bold text-gray-900 font-sans tracking-tight">Build Timetable</h1>
+              </div>
+              <p className="text-gray-500 text-xs">Select the class configuration parameters to manage or generate its timetable schedule.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('coordinatorTimetable_selectedClass')
+                localStorage.removeItem('coordinatorTimetable_timetableData')
+                localStorage.removeItem('coordinatorTimetable_currentStep')
+                navigate('/coordinator/dashboard/home')
+              }}
+              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-bold transition-all shadow-2xs"
+            >
+              Back to Dashboard
+            </button>
           </div>
-          <p className="text-gray-600">Select the class to create or edit its timetable</p>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Select Class Details</h2>
-          <TimetableSelector 
-            onSelect={handleClassSelection} 
-            renderActionButton={(selectedData) => (
-              selectedData && selectedData.year && selectedData.branch && selectedData.section && selectedData.semester && selectedData.academicYear ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedClass(selectedData)
-                    handleOpenGenerator()
-                  }}
-                  className="mt-6 flex items-center justify-center w-full py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors"
-                >
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  Generate Sample Timetable
-                </button>
-              ) : null
-            )}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-900 mb-4 text-left border-b border-gray-150 pb-2">Select Class Details</h2>
+            <TimetableSelector 
+              onSelect={handleClassSelection} 
+              renderActionButton={(selectedData) => (
+                selectedData && selectedData.year && selectedData.branch && selectedData.section && selectedData.semester && selectedData.academicYear ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClass(selectedData)
+                      handleOpenGenerator()
+                    }}
+                    className="flex items-center justify-center w-full py-2.5 px-4 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors text-xs font-bold border border-purple-200"
+                  >
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Generate Sample Timetable
+                  </button>
+                ) : null
+              )}
+            />
+          </div>
+
+          {showGenerator && selectedClass && (
+            <SampleTimetableConfigForm
+              branch={selectedClass.branch}
+              year={selectedClass.year}
+              semester={selectedClass.semester}
+              sections={selectedClass.section ? [selectedClass.section] : []}
+              academicYear={selectedClass.academicYear}
+              onClose={handleCloseGenerator}
+              onGenerationComplete={handleGenerationComplete}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Grid view (Read-only + Action controls inside TimetableGrid header) */}
+      {currentStep === 'grid' && (
+        <div className="w-full">
+          <TimetableGrid
+            data={selectedClass}
+            timetableData={timetableData}
+            onBack={handleBackToSelector}
+            isEditable={false}
+            showPDFExport={true}
+            mode="view"
+            onPublish={handlePublishTimetable}
+            onEdit={handleEditTimetable}
+            savedTimetableId={savedTimetableId}
+            isPublished={isPublished}
+            coordinatorName={coordinatorName}
           />
         </div>
+      )}
 
-        {showGenerator && selectedClass && (
-          <SampleTimetableConfigForm
-            branch={selectedClass.branch}
-            year={selectedClass.year}
-            semester={selectedClass.semester}
-            sections={selectedClass.section ? [selectedClass.section] : []}
-            academicYear={selectedClass.academicYear}
-            onClose={handleCloseGenerator}
-            onGenerationComplete={handleGenerationComplete}
+      {/* Edit view (Editable + Action controls inside TimetableGrid header) */}
+      {currentStep === 'edit' && (
+        <div className="w-full">
+          <TimetableGrid
+            data={selectedClass}
+            timetableData={timetableData}
+            onBack={handleBackToGrid}
+            isEditable={true}
+            showPDFExport={false}
+            onSave={handleSaveTimetable}
+            onPublish={handlePublishTimetable}
+            mode="edit"
+            savedTimetableId={savedTimetableId}
+            isPublished={isPublished}
+            coordinatorName={coordinatorName}
           />
-        )}
-      </div>
-    )}
-
-    {currentStep === 'grid' && (
-      <div className="w-full">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <button onClick={handleBackToSelector} className="mr-4 p-2 rounded-lg hover:bg-gray-200">
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Timetable - {selectedClass?.year} {selectedClass?.branch} {selectedClass?.section}
-              </h1>
-              <p className="text-gray-600">View and manage timetable</p>
-            </div>
-          </div>
-          <button
-            onClick={handleEditTimetable}
-            className="flex items-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
-          >
-            <Edit className="w-4 h-4 mr-2" /> Edit Timetable
-          </button>
         </div>
-
-        <TimetableGrid
-          data={selectedClass}
-          timetableData={timetableData}
-          onBack={handleBackToSelector}
-          isEditable={false}
-          showPDFExport={true}
-          mode="view"
-          onPublish={handlePublishTimetable}
-          savedTimetableId={savedTimetableId}
-          isPublished={isPublished}
-          coordinatorName={coordinatorName}
-        />
-      </div>
-    )}
-
-    {currentStep === 'edit' && (
-      <div className="w-full">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <button onClick={handleBackToGrid} className="mr-4 p-2 rounded-lg hover:bg-gray-200">
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Edit Timetable - {selectedClass?.year} {selectedClass?.branch} {selectedClass?.section}
-              </h1>
-              <p className="text-gray-600">Modify and update class schedule</p>
-            </div>
-          </div>
-        </div>
-
-        <TimetableGrid
-          data={selectedClass}
-          timetableData={timetableData}
-          onBack={handleBackToGrid}
-          isEditable={true}
-          showPDFExport={false}
-          onSave={handleSaveTimetable}
-          onPublish={handlePublishTimetable}
-          mode="edit"
-          savedTimetableId={savedTimetableId}
-          isPublished={isPublished}
-          coordinatorName={coordinatorName}
-        />
-      </div>
-    )}
-  </motion.div>
+      )}
+    </motion.div>
   )
 }
 
-export default CoordinatorTimetable;
+export default CoordinatorTimetable

@@ -10,6 +10,7 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
   const location = useLocation()
   const [activeUser, setActiveUser] = useState(user || null)
   const [loading, setLoading] = useState(true)
+  const [isEditingTimetable, setIsEditingTimetable] = useState(false)
 
   // 🔹 Persist user state across refreshes
   useEffect(() => {
@@ -51,22 +52,22 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <CoordinatorSidebar user={activeUser} onLogout={handleLogout} />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-64">
+      {/* Main Content - Full width layout (no sidebar) */}
+      <div className="flex-1 transition-all duration-250 ml-0">
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
-          className="p-6"
+          className={isEditingTimetable ? 'p-3' : 'p-6'}
         >
           <Routes>
             <Route path="/" element={<Navigate to="/coordinator/dashboard/home" replace />} />
-            <Route path="/home" element={<CoordinatorHome user={activeUser} />} />
-            <Route path="/timetable" element={<CoordinatorTimetable user={activeUser} />} />
+            <Route path="/home" element={<CoordinatorHome user={activeUser} onLogout={handleLogout} />} />
+            <Route 
+              path="/timetable" 
+              element={<CoordinatorTimetable user={activeUser} onStepChange={setIsEditingTimetable} />} 
+            />
           </Routes>
         </motion.div>
       </div>
