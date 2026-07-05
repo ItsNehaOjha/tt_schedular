@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Download, Bell, RefreshCw } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { timetableAPI } from '../../utils/api'
+import { timetableAPI, notificationAPI } from '../../utils/api'
 import TimetableGrid from '../../components/TimetableGrid'
 import { prepareTimetableForPDF } from '../../utils/prepareTimetableForPDF'  // ✅ Added centralized utility
 import { exportToPDF } from '../../utils/pdfExport'  // ✅ Static import (fix for failed dynamic import)
@@ -13,10 +13,85 @@ const StudentDashboard = () => {
   const navigate = useNavigate()
   const [timetable, setTimetable] = useState(null)
   const [notifications, setNotifications] = useState([])
+  const [showNotifications, setShowNotifications] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  const notificationRef = useRef(null)
   const { year, branch, section } = location.state || {}
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter(n => !n.isRead).length
+  }, [notifications])
+
+  const handleMarkSingleAsRead = async (id, e) => {
+    if (e) e.stopPropagation()
+    try {
+      await notificationAPI.markAsRead(id)
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n))
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
+  }
+
+  const handleMarkAllAsRead = async (e) => {
+    if (e) e.stopPropagation()
+    try {
+      const unread = notifications.filter(n => !n.isRead)
+      await Promise.all(unread.map(n => notificationAPI.markAsRead(n._id)))
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+    } catch (error) {
+      console.error('Error marking all as read:', error)
+    }
+  }
+
+  const handleDeleteAll = async (e) => {
+    if (e) e.stopPropagation()
+    const confirmDelete = window.confirm('Are you sure you want to delete all notifications?')
+    if (!confirmDelete) return
+    try {
+      await notificationAPI.deleteAll({ targetAudience: 'students' })
+      setNotifications([])
+      toast.success('All notifications deleted')
+    } catch (error) {
+      console.error('Error deleting all notifications:', error)
+      toast.error('Failed to delete notifications')
+    }
+  }
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      try {
+        await notificationAPI.markAsRead(notification._id)
+        setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n))
+      } catch (error) {
+        console.error('Error marking notification as read on click:', error)
+      }
+    }
+    fetchTimetable(true)
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   useEffect(() => {
     if (!year || !branch || !section) {
@@ -27,11 +102,11 @@ const StudentDashboard = () => {
     fetchTimetable()
     fetchNotifications()
 
-    // Auto-refresh every 5 minutes
+    // Auto-refresh every 15 seconds for real-time notification sync
     const interval = setInterval(() => {
       fetchTimetable(true)
       fetchNotifications()
-    }, 5 * 60 * 1000)
+    }, 15 * 1000)
 
     return () => clearInterval(interval)
   }, [year, branch, section])
@@ -60,8 +135,22 @@ const StudentDashboard = () => {
 
   const fetchNotifications = async () => {
     try {
-      const response = await timetableAPI.getTimetables()
-      setNotifications(response.data || [])
+      const response = await notificationAPI.getNotifications({ targetAudience: 'students' })
+      const allNotifications = response.data?.data || []
+      
+      const filtered = allNotifications.filter(n => {
+        if (n.relatedTimetable && typeof n.relatedTimetable === 'object') {
+          const t = n.relatedTimetable;
+          return (
+            String(t.year || '').toLowerCase() === String(year || '').toLowerCase() &&
+            String(t.branch || '').toLowerCase() === String(branch || '').toLowerCase() &&
+            String(t.section || '').toLowerCase() === String(section || '').toLowerCase()
+          );
+        }
+        return !n.relatedTimetable;
+      });
+
+      setNotifications(filtered)
     } catch (error) {
       console.error('Error fetching notifications:', error)
     }
@@ -121,8 +210,8 @@ const StudentDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="h-screen bg-gray-50 p-4 flex flex-col overflow-hidden">
+      <div className="max-w-6xl mx-auto w-full flex flex-col flex-grow overflow-hidden">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -160,15 +249,75 @@ const StudentDashboard = () => {
             >
               <RefreshCw className={`w-6 h-6 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-            <div className="relative">
-              <button className="p-2 rounded-lg hover:bg-gray-200 transition-colors">
+            <div className="relative" ref={notificationRef}>
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 rounded-lg hover:bg-gray-200 transition-colors relative"
+              >
                 <Bell className="w-6 h-6 text-gray-600" />
-                {notifications.length > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {notifications.length}
+                    {unreadCount}
                   </span>
                 )}
               </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 text-left">
+                  <div className="px-4 py-2 border-b border-gray-150 flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-sm">Notifications</span>
+                    <div className="flex space-x-2">
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={handleMarkAllAsRead} 
+                          className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button 
+                          onClick={handleDeleteAll} 
+                          className="text-xs text-red-600 hover:text-red-700 font-semibold"
+                        >
+                          Delete all
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-gray-500 text-xs">
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div 
+                          key={notification._id} 
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors cursor-pointer ${!notification.isRead ? 'bg-blue-50/40' : ''}`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-gray-950 text-xs">{notification.title}</span>
+                            {!notification.isRead && (
+                              <button 
+                                onClick={(e) => handleMarkSingleAsRead(notification._id, e)}
+                                className="text-[10px] text-blue-600 hover:text-blue-700 font-medium ml-2 shrink-0"
+                              >
+                                Mark read
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-gray-600 text-xs mt-1 leading-normal">{notification.message}</p>
+                          <span className="text-[10px] text-gray-400 block mt-1.5">
+                            {new Date(notification.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <button
   onClick={handleDownloadPDF}
@@ -186,35 +335,11 @@ const StudentDashboard = () => {
           </div>
         </motion.div>
 
-        {/* Notifications */}
-        {notifications.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">Notifications</h3>
-              <div className="space-y-2">
-                {notifications.slice(0, 3).map((notification) => (
-                  <div key={notification._id} className="text-sm text-blue-800">
-                    <span className="font-medium">{notification.title}</span>
-                    {notification.message && <span className="ml-2">{notification.message}</span>}
-                  </div>
-                ))}
-                {notifications.length > 3 && (
-                  <p className="text-xs text-blue-600">+{notifications.length - 3} more notifications</p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* Timetable Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-lg overflow-hidden"
+          className="bg-white rounded-lg shadow-lg overflow-hidden flex-grow flex flex-col"
         >
           {timetable ? (
             <TimetableGrid timetableData={timetable} />

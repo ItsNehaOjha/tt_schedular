@@ -5,8 +5,8 @@ import toast from 'react-hot-toast';
 export const useLocalDraft = (timetableData, data, mode, isEditable) => {
   const getLocalStorageKey = useCallback(() => {
     const actualData = timetableData || data;
-    if (actualData && actualData.branch && actualData.year && actualData.section) {
-      return `timetable_draft_${actualData.branch}_${actualData.year}_${actualData.section}`;
+    if (actualData && actualData.branch && actualData.year && actualData.section && actualData.semester && actualData.academicYear) {
+      return `timetable_draft_${actualData.branch}_${actualData.year}_${actualData.section}_${actualData.semester}_${actualData.academicYear}`;
     }
     return null;
   }, [timetableData, data]);
@@ -53,7 +53,6 @@ export const useLocalDraft = (timetableData, data, mode, isEditable) => {
       try {
         localStorage.removeItem(key);
         console.log('Cleared localStorage for:', key);
-        toast.success('Timetable data cleared from local storage');
       } catch (error) {
         console.error('Failed to clear localStorage:', error);
       }

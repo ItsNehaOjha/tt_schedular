@@ -166,7 +166,7 @@ function SampleTimetableConfigForm({ branch, year, semester, academicYear, secti
         const foundIdx = existingPerSection.findIndex(Boolean)
         if (foundIdx !== -1) {
           const existing = existingPerSection[foundIdx]
-          toast.success('Opening existing timetable for editing')
+          console.log('Opening existing timetable for editing')
           onGenerationComplete && onGenerationComplete({ existing })
           onClose && onClose()
           return

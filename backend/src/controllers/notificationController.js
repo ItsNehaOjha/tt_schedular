@@ -93,6 +93,23 @@ export const deleteNotification = asyncHandler(async (req, res, next) => {
   })
 })
 
+// @desc    Delete all notifications
+// @route   DELETE /api/notifications
+// @access  Public
+export const deleteAllNotifications = asyncHandler(async (req, res, next) => {
+  const { targetAudience } = req.query
+  let filter = {}
+  if (targetAudience) {
+    filter.targetAudience = { $in: [targetAudience, 'all'] }
+  }
+  await Notification.deleteMany(filter)
+
+  res.status(200).json({
+    success: true,
+    message: 'All notifications deleted successfully'
+  })
+})
+
 // Helper function to create timetable notifications
 export const createTimetableNotification = async (timetableId, type, createdBy) => {
   try {
@@ -110,6 +127,9 @@ export const createTimetableNotification = async (timetableId, type, createdBy) 
       'timetable_published': `Timetable for ${timetable.year} ${timetable.branch} Section ${timetable.section} has been published.`,
       'timetable_updated': `Timetable for ${timetable.year} ${timetable.branch} Section ${timetable.section} has been updated.`
     }
+
+    // Delete any existing notifications for this timetable of the same type to avoid duplicates
+    await Notification.deleteMany({ relatedTimetable: timetableId, type })
 
     await Notification.create({
       title: titles[type],

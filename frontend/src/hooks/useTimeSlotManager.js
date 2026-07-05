@@ -40,7 +40,7 @@ export const useTimeSlotManager = (
     const oldSlot = timeSlots[index];
 
     days.forEach(day => {
-      if (newSchedule[day] && newSchedule[day][oldSlot]) {
+      if (newSchedule[day] && newSchedule[day][oldSlot] !== undefined) {
         const cellData = newSchedule[day][oldSlot];
         delete newSchedule[day][oldSlot];
         newSchedule[day][newTimeSlot] = cellData;
@@ -53,7 +53,7 @@ export const useTimeSlotManager = (
         const newSlotName = adjustedSlots[i];
         if (oldSlotName !== newSlotName) {
           days.forEach(day => {
-            if (newSchedule[day] && newSchedule[day][oldSlotName]) {
+            if (newSchedule[day] && newSchedule[day][oldSlotName] !== undefined) {
               const cellData = newSchedule[day][oldSlotName];
               delete newSchedule[day][oldSlotName];
               newSchedule[day][newSlotName] = cellData;
@@ -94,6 +94,8 @@ export const useTimeSlotManager = (
     const removedIndex = timeSlots.indexOf(slotToRemove);
     const newTimeSlots = timeSlots.filter(slot => slot !== slotToRemove);
 
+    const newSchedule = { ...scheduleData };
+
     if (removedIndex < newTimeSlots.length) {
       let adjustStartTime;
       if (removedIndex > 0) {
@@ -105,42 +107,41 @@ export const useTimeSlotManager = (
       }
 
       for (let i = removedIndex; i < newTimeSlots.length; i++) {
-        const currentSlot = parseTimeSlot(newTimeSlots[i]);
+        const oldSlotName = newTimeSlots[i];
+        const currentSlot = parseTimeSlot(oldSlotName);
         const newEnd = adjustStartTime + currentSlot.duration;
         const adjustedSlot = createTimeSlot(adjustStartTime, newEnd);
-        const oldSlotName = newTimeSlots[i];
         newTimeSlots[i] = adjustedSlot;
 
-        const newSchedule = { ...scheduleData };
         days.forEach(day => {
-          if (newSchedule[day] && newSchedule[day][oldSlotName]) {
+          if (newSchedule[day] && newSchedule[day][oldSlotName] !== undefined) {
             const cellData = newSchedule[day][oldSlotName];
             delete newSchedule[day][oldSlotName];
             newSchedule[day][adjustedSlot] = cellData;
           }
         });
-        setScheduleData(newSchedule);
         adjustStartTime = newEnd;
       }
     }
 
-    setTimeSlots(newTimeSlots);
-    const newSchedule = { ...scheduleData };
     days.forEach(day => {
       if (newSchedule[day]) {
         delete newSchedule[day][slotToRemove];
       }
     });
+
+    setTimeSlots(newTimeSlots);
     setScheduleData(newSchedule);
   }, [timeSlots, setTimeSlots, days, scheduleData, setScheduleData, setDeletedTimeSlots]);
 
   const restoreTimeSlot = useCallback((deletedSlotData) => {
     const { slot, data } = deletedSlotData;
-    const slotTime = parseTimeSlot(slot);
+    const restoredSlotParsed = parseTimeSlot(slot);
+
     let insertIndex = timeSlots.length;
     for (let i = 0; i < timeSlots.length; i++) {
       const currentSlotTime = parseTimeSlot(timeSlots[i]);
-      if (slotTime.start < currentSlotTime.start) {
+      if (restoredSlotParsed.start <= currentSlotTime.start) {
         insertIndex = i;
         break;
       }
@@ -148,13 +149,33 @@ export const useTimeSlotManager = (
 
     const newTimeSlots = [...timeSlots];
     newTimeSlots.splice(insertIndex, 0, slot);
-    setTimeSlots(newTimeSlots);
 
     const newSchedule = { ...scheduleData };
     days.forEach(day => {
       if (!newSchedule[day]) newSchedule[day] = {};
       newSchedule[day][slot] = data[day] || { subject: '', teacher: '', type: 'lecture', room: '' };
     });
+
+    // Recalculate start/end and shift down subsequent rows starting from index + 1
+    let adjustStartTime = restoredSlotParsed.end;
+    for (let i = insertIndex + 1; i < newTimeSlots.length; i++) {
+      const oldSlotName = newTimeSlots[i];
+      const currentSlot = parseTimeSlot(oldSlotName);
+      const newEnd = adjustStartTime + currentSlot.duration;
+      const adjustedSlot = createTimeSlot(adjustStartTime, newEnd);
+      newTimeSlots[i] = adjustedSlot;
+
+      days.forEach(day => {
+        if (newSchedule[day] && newSchedule[day][oldSlotName] !== undefined) {
+          const cellData = newSchedule[day][oldSlotName];
+          delete newSchedule[day][oldSlotName];
+          newSchedule[day][adjustedSlot] = cellData;
+        }
+      });
+      adjustStartTime = newEnd;
+    }
+
+    setTimeSlots(newTimeSlots);
     setScheduleData(newSchedule);
     setDeletedTimeSlots(prev => prev.filter(item => item.timestamp !== deletedSlotData.timestamp));
   }, [timeSlots, setTimeSlots, days, scheduleData, setScheduleData, setDeletedTimeSlots]);

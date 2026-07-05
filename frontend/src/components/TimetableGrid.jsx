@@ -63,7 +63,7 @@ const TimetableGrid = ({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl flex flex-col max-h-[calc(100vh-140px)]">
+    <div className="bg-white border border-gray-200 rounded-xl flex flex-col flex-grow h-full overflow-hidden">
       {/* Sticky Action Header */}
       <StickyHeader
         onBack={onBack}
@@ -133,6 +133,7 @@ const TimetableGrid = ({
           day={editingCell.day}
           data={data}
           timetableData={timetableData}
+          scheduleData={scheduleData}
         />
       )}
 

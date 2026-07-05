@@ -9,7 +9,7 @@ const classSectionSchema = new mongoose.Schema({
   branch: {
     type: String,
     required: [true, 'Branch is required'],
-    enum: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
+    enum: ['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
 
   },
   section: {

@@ -21,7 +21,7 @@ const TimetableSelector = ({ onSelect, renderActionButton }) => {
   const branches = [
     { value: 'CSE', label: 'Computer Science & Engineering' },
     { value: 'CS', label: 'Computer Science' },
-    { value: 'Biotechnology', label: 'Biotechnology' },
+    { value: 'BT', label: 'BT' },
     { value: 'CE', label: 'Civil Engineering' },
     { value: 'IT', label: 'Information Technology' },
     { value: 'EC', label: 'Electronics & Communication' },
@@ -64,7 +64,7 @@ const TimetableSelector = ({ onSelect, renderActionButton }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      
+
       {/* Responsive Two-Column Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
         <div>
@@ -160,16 +160,15 @@ const TimetableSelector = ({ onSelect, renderActionButton }) => {
           type="submit"
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className={`w-full py-2.5 px-4 rounded-lg font-bold text-xs transition-colors ${
-            isFormValid
+          className={`w-full py-2.5 px-4 rounded-lg font-bold text-xs transition-colors ${isFormValid
               ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
+            }`}
           disabled={!isFormValid}
         >
           Create/View Timetable
         </motion.button>
-        
+
         {/* Render custom action generator button if provided */}
         {renderActionButton && renderActionButton(formData)}
       </div>

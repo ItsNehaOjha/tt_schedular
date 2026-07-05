@@ -7,7 +7,7 @@ import api from '../../utils/api'
 
 const StudentPage = () => {
   const navigate = useNavigate()
-  
+
   // Load initial state from localStorage
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('studentPage_formData')
@@ -44,7 +44,7 @@ const StudentPage = () => {
       // Fallback to static options
       setOptions({
         years: ['1', '2', '3', '4'],
-        branches: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'],
+        branches: ['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'],
 
         sections: ['A', 'B', 'C', 'D']
       })
@@ -65,19 +65,19 @@ const StudentPage = () => {
       // Convert numeric year to the format expected by backend
       const yearMapping = {
         '1': '1st Year',
-        '2': '2nd Year', 
+        '2': '2nd Year',
         '3': '3rd Year',
         '4': '4th Year'
       }
-      
+
       const formattedYear = yearMapping[formData.year] || formData.year
-      
-      navigate('/student/dashboard', { 
-        state: { 
-          year: formattedYear, 
-          branch: formData.branch, 
-          section: formData.section 
-        } 
+
+      navigate('/student/dashboard', {
+        state: {
+          year: formattedYear,
+          branch: formData.branch,
+          section: formData.section
+        }
       })
     }
   }
@@ -189,11 +189,10 @@ const StudentPage = () => {
               whileTap={{ scale: 0.98 }}
               onClick={handleViewTimetable}
               disabled={!isFormValid}
-              className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
-                isFormValid
+              className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${isFormValid
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+                }`}
             >
               View Timetable
             </motion.button>

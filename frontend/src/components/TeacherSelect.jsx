@@ -19,6 +19,7 @@ export default function TeacherSelect({
   disabled = false,
   placeholder = "Select teacher...",
   currentClass = null, // { branch, year, section, academicYear, semester }
+  scheduleData = null,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -137,6 +138,89 @@ export default function TeacherSelect({
     return () => { alive = false; };
   }, [open, day, slotKey, timeSlot]);
 
+  // Helper functions for time slot overlap logic in frontend
+  const toMinutes = (t) => {
+    if (!t) return null;
+    const raw = String(t).trim();
+    const hasAM = /\bAM\b/i.test(raw);
+    const hasPM = /\bPM\b/i.test(raw);
+    const clean = raw.replace(/\s*(AM|PM)\s*/gi, '');
+    const [hStr, mStr] = clean.split(':');
+    let h = Number(hStr);
+    const m = Number(mStr || 0);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    if (hasPM && h !== 12) h += 12;
+    if (hasAM && h === 12) h = 0;
+    return h * 60 + m;
+  };
+
+  const parseRange = (range) => {
+    if (!range || typeof range !== 'string' || !range.includes('-')) return null;
+    const [start, end] = range.split('-').map(s => s.trim());
+    const s = toMinutes(start);
+    const e = toMinutes(end);
+    if (s == null || e == null || e <= s) return null;
+    return { s, e };
+  };
+
+  const overlaps = (a, b) => a && b && Math.max(a.s, b.s) < Math.min(a.e, b.e);
+
+  const inMemoryBusy = useMemo(() => {
+    const busy = new Set();
+    const busyDetails = new Map();
+    if (!scheduleData || !day || !timeSlot) return { busy, busyDetails };
+
+    const qRange = parseRange(timeSlot);
+    if (!qRange) return { busy, busyDetails };
+
+    const slots = scheduleData[day] || {};
+    Object.entries(slots).forEach(([sSlot, cell]) => {
+      // Exclude current editing cell
+      if (sSlot === timeSlot) return;
+
+      if (!cell || (!cell.teacher && !cell.teacherId && !cell.parallelSessions)) return;
+
+      const sRange = parseRange(sSlot);
+      if (!sRange || !overlaps(qRange, sRange)) return;
+
+      const teachersList = [];
+      if (cell.type === 'split-lab' && Array.isArray(cell.parallelSessions)) {
+        cell.parallelSessions.forEach(p => {
+          if (p.teacherId || p.teacher) {
+            teachersList.push({ id: p.teacherId || p.teacher, name: p.teacher || '' });
+          }
+        });
+      } else if (cell.teacherId || cell.teacher) {
+        teachersList.push({ id: cell.teacherId || cell.teacher, name: cell.teacher || '' });
+      }
+
+      teachersList.forEach(t => {
+        const idStr = String(t.id);
+        busy.add(idStr);
+        busyDetails.set(idStr, {
+          classLabel: 'Current Timetable',
+          classDetail: cell.subject ? `${cell.subject} (Slot: ${sSlot})` : `Slot: ${sSlot}`
+        });
+      });
+    });
+
+    return { busy, busyDetails };
+  }, [scheduleData, day, timeSlot]);
+
+  const combinedBusyIds = useMemo(() => {
+    const combined = new Set(busyIds);
+    inMemoryBusy.busy.forEach(id => combined.add(id));
+    return combined;
+  }, [busyIds, inMemoryBusy.busy]);
+
+  const combinedDetailsMap = useMemo(() => {
+    const combined = new Map(teacherDetailsMap);
+    inMemoryBusy.busyDetails.forEach((val, key) => {
+      combined.set(key, val);
+    });
+    return combined;
+  }, [teacherDetailsMap, inMemoryBusy.busyDetails]);
+
   // Search + ranking: startsWith gets higher priority than contains
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -176,7 +260,7 @@ export default function TeacherSelect({
   }, []);
 
   function handlePick(t) {
-    if (busyIds.has(String(t.id))) return;
+    if (combinedBusyIds.has(String(t.id))) return;
     onChange?.({ id: t.id, name: t.name, teacherId: t.teacherId, department: t.department });
     setOpen(false);
   }
@@ -225,7 +309,7 @@ export default function TeacherSelect({
           <div style={styles.list}>
             {filtered.length === 0 && <div style={styles.empty}>No teachers match.</div>}
             {filtered.map((t) => {
-              const isBusy = busyIds.has(String(t.id));
+              const isBusy = combinedBusyIds.has(String(t.id));
               return (
                 <div
                   key={t.id}
@@ -242,14 +326,14 @@ export default function TeacherSelect({
                     </div>
 
                     {/* Display class and section information for busy teachers */}
-                    {isBusy && teacherDetailsMap.has(String(t.id)) && (
+                    {isBusy && combinedDetailsMap.has(String(t.id)) && (
                       <>
                         <div style={styles.busyClassLabel}>
-                          {teacherDetailsMap.get(String(t.id)).classLabel}
+                          {combinedDetailsMap.get(String(t.id)).classLabel}
                         </div>
-                        {teacherDetailsMap.get(String(t.id)).classDetail && (
+                        {combinedDetailsMap.get(String(t.id)).classDetail && (
                           <div style={styles.busyClassDetail}>
-                            {teacherDetailsMap.get(String(t.id)).classDetail}
+                            {combinedDetailsMap.get(String(t.id)).classDetail}
                           </div>
                         )}
                       </>

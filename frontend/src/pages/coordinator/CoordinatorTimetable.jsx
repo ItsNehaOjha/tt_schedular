@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Calendar, Wand2 } from 'lucide-react'
+import { Calendar, Wand2, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TimetableSelector from '../../components/TimetableSelector'
 import TimetableGrid from '../../components/TimetableGrid'
@@ -116,7 +116,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
         setSavedTimetableId(existing._id || existing.id)
         setIsPublished(Boolean(existing.isPublished))
         setCurrentStep('edit')
-        toast.success('Existing timetable opened')
+        console.log('Existing timetable opened')
         return
       }
 
@@ -141,7 +141,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
             setSavedTimetableId(data._id || data.id)
             setIsPublished(Boolean(data.isPublished))
             setCurrentStep('edit')
-            toast.success('Draft timetable loaded')
+            console.log('Draft timetable loaded')
             return
           }
         } catch {}
@@ -162,7 +162,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
           setSavedTimetableId(draft._id || draft.id)
           setIsPublished(Boolean(draft.isPublished))
           setCurrentStep('edit')
-          toast.success('Draft timetable loaded')
+          console.log('Draft timetable loaded')
         } else {
           toast.error('Generated timetable not found')
         }
@@ -186,7 +186,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
         setSavedTimetableId(data._id || data.id)
         setIsPublished(false)
         setCurrentStep('edit')
-        toast.success('Draft timetable loaded successfully')
+        console.log('Draft timetable loaded successfully')
       }
     } catch (err) {
       console.error('Fetch draft timetable error:', err)
@@ -204,7 +204,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
       const savedData = localStorage.getItem('coordinatorTimetable_timetableData')
 
       if (savedStep && savedClass) {
-        setCurrentStep(savedStep)
+        setCurrentStep(savedStep === 'grid' ? 'edit' : savedStep)
         const classData = JSON.parse(savedClass)
         setSelectedClass(classData)
 
@@ -248,7 +248,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
 
   const handleClassSelection = async (classData) => {
     setSelectedClass(classData)
-    setCurrentStep('grid')
+    setCurrentStep('edit')
     await fetchExistingTimetable(classData)
   }
 
@@ -278,7 +278,13 @@ const CoordinatorTimetable = ({ onStepChange }) => {
       localStorage.removeItem('coordinatorTimetable_currentStep')
       navigate('/coordinator/dashboard/home')
     } else {
-      setCurrentStep('grid')
+      localStorage.removeItem('coordinatorTimetable_selectedClass')
+      localStorage.removeItem('coordinatorTimetable_timetableData')
+      setSelectedClass(null)
+      setTimetableData(null)
+      setSavedTimetableId(null)
+      setIsPublished(false)
+      setCurrentStep('selector')
     }
   }
 
@@ -401,14 +407,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
       {/* Selector view */}
       {currentStep === 'selector' && (
         <div className="max-w-2xl mx-auto">
-          <div className="mb-6 select-none text-left flex items-start justify-between">
-            <div>
-              <div className="flex items-center mb-3">
-                <Calendar className="w-7 h-7 text-purple-500 mr-2.5" />
-                <h1 className="text-2xl font-bold text-gray-900 font-sans tracking-tight">Build Timetable</h1>
-              </div>
-              <p className="text-gray-500 text-xs">Select the class configuration parameters to manage or generate its timetable schedule.</p>
-            </div>
+          <div className="mb-6 select-none text-left flex items-center space-x-3">
             <button
               type="button"
               onClick={() => {
@@ -417,10 +416,18 @@ const CoordinatorTimetable = ({ onStepChange }) => {
                 localStorage.removeItem('coordinatorTimetable_currentStep')
                 navigate('/coordinator/dashboard/home')
               }}
-              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-bold transition-all shadow-2xs"
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+              title="Back to Dashboard"
             >
-              Back to Dashboard
+              <ArrowLeft className="w-5 h-5" />
             </button>
+            <div>
+              <div className="flex items-center mb-1">
+                <Calendar className="w-7 h-7 text-purple-500 mr-2.5" />
+                <h1 className="text-2xl font-bold text-gray-900 font-sans tracking-tight">Build Timetable</h1>
+              </div>
+              <p className="text-gray-500 text-xs">Select the class configuration parameters to manage or generate its timetable schedule.</p>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -461,7 +468,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
 
       {/* Grid view (Read-only + Action controls inside TimetableGrid header) */}
       {currentStep === 'grid' && (
-        <div className="w-full">
+        <div className="w-full flex-grow overflow-hidden flex flex-col">
           <TimetableGrid
             data={selectedClass}
             timetableData={timetableData}
@@ -480,7 +487,7 @@ const CoordinatorTimetable = ({ onStepChange }) => {
 
       {/* Edit view (Editable + Action controls inside TimetableGrid header) */}
       {currentStep === 'edit' && (
-        <div className="w-full">
+        <div className="w-full flex-grow overflow-hidden flex flex-col">
           <TimetableGrid
             data={selectedClass}
             timetableData={timetableData}

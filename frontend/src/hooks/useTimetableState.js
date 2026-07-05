@@ -82,7 +82,7 @@ export const useTimetableState = ({
         academicYear: actualData?.academicYear || ''
       });
       setScheduleData(saved.scheduleData || createEmptySchedule(saved.days || defaultDays, saved.timeSlots || defaultTimeSlots));
-      toast.success('Restored unsaved changes from local storage');
+      console.log('Restored unsaved changes from local storage');
       setIsInitialized(true);
       return;
     }
@@ -282,6 +282,22 @@ export const useTimetableState = ({
     }
   }, [editingCell, scheduleData, timeSlots, days, timetableData, data, timetableInfo]);
 
+  const handleResetDraft = useCallback(() => {
+    clearLocalTimetableData();
+
+    const newSchedule = {};
+    days.forEach(d => {
+      newSchedule[d] = {};
+      timeSlots.forEach(s => {
+        newSchedule[d][s] = { subject: '', teacher: '', type: 'lecture', room: '' };
+      });
+    });
+
+    setScheduleData(newSchedule);
+    setDeletedTimeSlots([]);
+    toast.success('Draft reset successfully (all cell content cleared)');
+  }, [days, timeSlots, clearLocalTimetableData]);
+
   return {
     editingCell,
     setEditingCell,
@@ -303,6 +319,6 @@ export const useTimetableState = ({
     handleCellClick,
     handleClearCell,
     handleSaveCell,
-    clearLocalTimetableData
+    clearLocalTimetableData: handleResetDraft
   };
 };

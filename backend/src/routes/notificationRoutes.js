@@ -4,7 +4,8 @@ import {
   getNotifications,
   createNotification,
   markAsRead,
-  deleteNotification
+  deleteNotification,
+  deleteAllNotifications
 } from '../controllers/notificationController.js'
 import { protect, authorize } from '../middleware/authMiddleware.js'
 
@@ -34,11 +35,12 @@ const notificationValidation = [
     .optional()
     .isIn(['low', 'medium', 'high'])
     .withMessage('Invalid priority level')
-]
+ ]
 
 // Public routes
 router.get('/', getNotifications)
 router.put('/:id/read', markAsRead)
+router.delete('/', deleteAllNotifications)
 
 // Protected routes (Coordinator only)
 router.use(protect)

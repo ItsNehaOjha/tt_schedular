@@ -33,9 +33,14 @@ api.interceptors.response.use(
     const isLoginEndpoint = error.config?.url?.includes('/auth/login');
     
     if (error.response?.status === 401 && !isLoginEndpoint) {
+      const token = localStorage.getItem('token');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/coordinator/login';
+      
+      const isAlreadyAtLogin = window.location.pathname.includes('/login');
+      if (token && !isAlreadyAtLogin) {
+        window.location.href = '/coordinator/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -100,6 +105,13 @@ export const timetableAPI = {
     api.post('/timetable/generate-sample', payload),
   getDraftById: (id) =>
     api.get(`/timetable/draft/${id}`)
+};
+
+export const notificationAPI = {
+  getNotifications: (params = {}) => api.get('/notifications', { params }),
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  deleteAll: (params = {}) => api.delete('/notifications', { params })
 };
 
 export default api;

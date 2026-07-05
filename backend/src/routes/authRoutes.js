@@ -25,7 +25,7 @@ const coordinatorRegisterValidation = [
     .withMessage('Coordinator name must be between 2 and 100 characters')
     .trim(),
   body('branch')
-    .isIn(['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'])
+    .isIn(['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'])
     .withMessage('Please select a valid branch'),
   body('year')
     .isIn(['1', '2', '3', '4'])

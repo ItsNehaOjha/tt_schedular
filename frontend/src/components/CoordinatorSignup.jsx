@@ -21,7 +21,7 @@ const CoordinatorSignup = () => {
   const branchOptions = [
     { value: 'CSE', label: 'Computer Science & Engineering' },
     { value: 'CS', label: 'Computer Science' },
-    { value: 'Biotechnology', label: 'Biotechnology' },
+    { value: 'BT', label: 'BT' },
     { value: 'CE', label: 'Civil Engineering' },
     { value: 'IT', label: 'Information Technology' },
     { value: 'EC', label: 'Electronics & Communication' },
@@ -56,7 +56,7 @@ const CoordinatorSignup = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match.')
       return

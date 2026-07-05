@@ -3,23 +3,23 @@ import mongoose from 'mongoose'
 const scheduleSlotSchema = new mongoose.Schema({
   day: {
     type: String,
-    
+
     enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   },
   // add in scheduleSlotSchema:
-slotKey: {
-  type: String,  // TS1, TS2, LUNCH, ...
-  trim: true
-},
+  slotKey: {
+    type: String,  // TS1, TS2, LUNCH, ...
+    trim: true
+  },
 
   timeSlot: {
     type: String,
-    
+
   },
   subject: {
     acronym: {
       type: String,
-      
+
       trim: true
     },
     code: {
@@ -38,7 +38,7 @@ slotKey: {
     },
     name: {
       type: String,
-      
+
       trim: true
     },
     username: {
@@ -48,7 +48,7 @@ slotKey: {
   },
   type: {
     type: String,
-    enum: ['lecture', 'lab','split-lab', 'lunch', 'free', 'break', 'library', 'mini project', 'mentor'],
+    enum: ['lecture', 'lab', 'split-lab', 'lunch', 'free', 'break', 'library', 'mini project', 'mentor'],
     default: 'lecture'
   },
   room: {
@@ -68,7 +68,7 @@ const timetableSchema = new mongoose.Schema({
   branch: {
     type: String,
     required: [true, 'Branch is required'],
-    enum: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']  
+    enum: ['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
   },
   section: {
     type: String,
@@ -86,17 +86,17 @@ const timetableSchema = new mongoose.Schema({
     required: true
   },
   publishedVersion: {
-  type: Number,
-  default: 1
-},
+    type: Number,
+    default: 1
+  },
 
-revisionHistory: [
-  {
-    version: Number,
-    updatedAt: Date,
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-  }
-],
+  revisionHistory: [
+    {
+      version: Number,
+      updatedAt: Date,
+      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }
+  ],
 
   schedule: [scheduleSlotSchema],
   isPublished: {

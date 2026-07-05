@@ -10,7 +10,7 @@ export const getClassOptions = async (req, res) => {
 
     // If no data exists, provide default options
     const defaultYears = ['1', '2', '3', '4']
-    const defaultBranches = ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']  
+    const defaultBranches = ['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
     const defaultSections = ['A', 'B', 'C', 'D']
 
     // Sort the arrays
@@ -33,8 +33,8 @@ export const getClassOptions = async (req, res) => {
       success: true,
       data: {
         years: ['1', '2', '3', '4'],
-        branches: ['CSE', 'CS', 'Biotechnology', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
-,
+        branches: ['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA']
+        ,
         sections: ['A', 'B', 'C', 'D']
       }
     })
@@ -66,7 +66,7 @@ export const getAllClasses = async (req, res) => {
 export const getClassesByFilter = async (req, res) => {
   try {
     const { year, branch, section } = req.query
-    
+
     let filter = {}
     if (year) filter.year = year
     if (branch) filter.branch = branch.toUpperCase()

@@ -1,5 +1,6 @@
 import express from 'express'
 import { body } from 'express-validator'
+import { normalizeBranch } from '../utils/branchHelper.js'
 import {
   getTimetables,
   getTimetableByBranchSection,
@@ -25,13 +26,13 @@ const timetableValidation = [
     .isIn(['1st Year', '2nd Year', '3rd Year', '4th Year'])
     .withMessage('Invalid year'),
   body('branch')
-  .customSanitizer(value => value.toUpperCase().trim())
-  .isIn(['CSE', 'CS', 'IT', 'EC', 'EE', 'ME', 'CE', 'MCA', 'MBA'])
-  .withMessage('Invalid branch'),
- body('section')
-  .customSanitizer(value => value.toUpperCase().trim())
-  .isIn(['A', 'B', 'C', 'D'])
-  .withMessage('Invalid section'),
+    .customSanitizer(value => normalizeBranch(value))
+    .isIn(['CSE', 'CS', 'BT', 'CE', 'IT', 'EC', 'EE', 'ME', 'MBA', 'MCA'])
+    .withMessage('Invalid branch'),
+  body('section')
+    .customSanitizer(value => value.toUpperCase().trim())
+    .isIn(['A', 'B', 'C', 'D'])
+    .withMessage('Invalid section'),
   body('semester')
     .isInt({ min: 1, max: 8 })
     .withMessage('Semester must be between 1 and 8'),
@@ -47,8 +48,8 @@ router.get('/teacher/:id', getTeacherTimetable) // <-- must be BEFORE "/:branch/
 router.get('/:branch/:section', getTimetableByBranchSection)
 
 // ---------- PROTECTED (COORDINATOR) ROUTES ----------
-router.get('/stats',  getTimetableStats)
-router.get('/class',  getTimetableByClass)
+router.get('/stats', getTimetableStats)
+router.get('/class', getTimetableByClass)
 router.get('/draft/:id', getDraftTimetable)
 
 // from here on: require auth
@@ -58,11 +59,11 @@ router.get('/draft/:id', getDraftTimetable)
 router.get('/teacher/:id/timetable', getTeacherTimetable)
 
 // coordinator-only CRUD
-router.get('/',  getTimetables)
-router.post('/',  timetableValidation, createTimetable)
+router.get('/', getTimetables)
+router.post('/', timetableValidation, createTimetable)
 router.post('/generate-sample', generateSampleTimetable)
-router.put('/:id',  updateTimetable)
-router.put('/:id/publish',  publishTimetable)
-router.delete('/:id',  deleteTimetable) 
+router.put('/:id', updateTimetable)
+router.put('/:id/publish', publishTimetable)
+router.delete('/:id', deleteTimetable)
 
 export default router

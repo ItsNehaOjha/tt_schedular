@@ -40,6 +40,11 @@ export const usePublishActions = ({
       });
     });
 
+    if (scheduleArray.length === 0) {
+      toast.error('Please add at least one timetable entry before saving.');
+      return;
+    }
+
     const timetableToSave = {
       year: timetableInfo.year,
       branch: timetableInfo.branch,

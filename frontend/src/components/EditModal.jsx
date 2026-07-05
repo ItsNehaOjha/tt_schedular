@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import api, { teacherAPI, subjectAPI } from '../utils/api'
 import TeacherSelect from './TeacherSelect'
 
-const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, timetableData }) => {
+const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, timetableData, scheduleData }) => {
   const [formData, setFormData] = useState({
     type: 'lecture',
     subject: '',
@@ -403,6 +403,7 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
                       academicYear: data?.academicYear || timetableData?.academicYear,
                       semester: data?.semester || timetableData?.semester
                     }}
+                    scheduleData={scheduleData}
                   />
 
                   <input
@@ -436,6 +437,7 @@ const EditModal = ({ isOpen, onClose, onSave, initialData, timeSlot, day, data, 
                 academicYear: data?.academicYear || timetableData?.academicYear,
                 semester: data?.semester || timetableData?.semester
               }}
+              scheduleData={scheduleData}
             />
           )}
 
